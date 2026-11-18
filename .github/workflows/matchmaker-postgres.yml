@@ -46,6 +46,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/cleanup-postgres.sql
       - name: Test close and late-post receipt coordination
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/post-close-race-postgres.sql
+      - name: Test audited manual receipt recovery in disposable DB
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/manual-reconciliation-postgres.sql
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
