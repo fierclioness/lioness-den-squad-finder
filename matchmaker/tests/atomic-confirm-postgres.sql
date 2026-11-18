@@ -1,5 +1,18 @@
 \set ON_ERROR_STOP on
 \ir ../atomic-confirm.review.sql
+-- Install test-only failure injection as the disposable DB owner BEFORE
+-- switching to the least-privileged service_role. No production changes.
+create function pg_temp.reject_enqueue() returns trigger language plpgsql as $fn$
+begin
+ if current_setting('matchmaker.test_fail_enqueue',true)='yes'
+    and exists(select 1 from matchmaker_internal.squad_listings
+      where id=new.listing_id and owner_discord_id='1418199180287148461')
+ then raise exception 'Test-only enqueue failure'; end if;
+ return new;
+end $fn$;
+create trigger test_reject_confirm_enqueue before insert
+ on matchmaker_internal.post_outbox for each row
+ execute function pg_temp.reject_enqueue();
 SET ROLE service_role;
 DO $$
 declare
@@ -24,25 +37,14 @@ begin
  -- Force a *test-only* insert failure. Since the RPC is a single DB
  -- transaction, the listing and preview consumption must BOTH roll back.
  token2:=matchmaker_internal.prepare_preview(owner2,'COD','PC','Casual','Optional','ET','Saturday');
- -- No permanent triggers / schema objects are used for failure injection.
- -- Create a temporary function in pg_temp to intercept insert and fail.
- execute $ddl$
-   create function pg_temp.reject_enqueue()
-   returns trigger language plpgsql as $fn$
-   begin
-     if exists(select 1 from matchmaker_internal.squad_listings
-       where id=new.listing_id and owner_discord_id='1418199180287148461')
-     then raise exception 'Test-only enqueue failure'; end if;
-     return new;
-   end $fn$ $ddl$;
- execute 'create trigger test_reject_confirm_enqueue before insert on matchmaker_internal.post_outbox for each row execute function pg_temp.reject_enqueue()';
+ perform set_config('matchmaker.test_fail_enqueue','yes',false);
  begin
    perform matchmaker_internal.confirm_and_enqueue(owner2,token2);
    raise exception 'Expected injected outbox insert failure';
  exception when others then
    if sqlerrm<>'Test-only enqueue failure' then raise; end if;
  end;
- execute 'drop trigger test_reject_confirm_enqueue on matchmaker_internal.post_outbox';
+ perform set_config('matchmaker.test_fail_enqueue','no',false);
  if exists(select 1 from matchmaker_internal.squad_listings where owner_discord_id=owner2)
  then raise exception 'Orphaned confirmed listing after enqueue failed'; end if;
  if not exists(select 1 from matchmaker_internal.pending_previews
@@ -56,4 +58,6 @@ begin
  if outbox_count<>1 then raise exception 'Retry did not atomically enqueue'; end if;
 end $$;
 RESET ROLE;
+drop trigger test_reject_confirm_enqueue on matchmaker_internal.post_outbox;
+drop function pg_temp.reject_enqueue();
 SELECT 'Atomic confirmation, rollback, retry, and no-orphan checks PASSED' as result;
