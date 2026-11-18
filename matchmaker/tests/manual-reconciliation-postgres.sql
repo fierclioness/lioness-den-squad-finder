@@ -13,10 +13,9 @@ begin
  perform matchmaker_internal.enqueue_post(id);
  if matchmaker_internal.claim_post(worker) is distinct from id then raise exception 'Claim failed'; end if;
  perform matchmaker_internal.fail_post(id,worker,false,'Network timeout: result unknown');
- if not matchmaker_internal.close_with_post_guard(member)='not_active'
- then -- close still returns closed_delivery_unresolved or closed_without_post
-   null;
- end if;
+ outcome:=matchmaker_internal.close_with_post_guard(member);
+ if outcome<>'closed_delivery_unresolved'
+ then raise exception 'Expected unresolved close, got %',outcome; end if;
  outcome:=matchmaker_internal.record_manual_receipt(id,'1546529501859815501',
    '1546529497925296199','1546529501859815438','ops-ticket-117',
    'Operator verified exact original Discord bot-owned message');
