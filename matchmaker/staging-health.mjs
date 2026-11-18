@@ -2,7 +2,9 @@
 // Does not read secrets, query databases or accept commands.
 export function stagingHealthResponse(request){
  const url=new URL(request.url);
- if(request.method!=="GET"||url.pathname!=="/functions/v1/den-matchmaker/health")
+ const isHealth=url.pathname==="/health" || url.pathname==="/den-matchmaker/health" ||
+   url.pathname==="/functions/v1/den-matchmaker/health";
+ if(request.method!=="GET"||!isHealth)
    return null;
  return new Response(JSON.stringify({
    service:"den-matchmaker",
