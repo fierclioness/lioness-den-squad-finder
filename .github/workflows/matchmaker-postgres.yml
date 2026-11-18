@@ -42,6 +42,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/postgres-smoke.sql
       - name: Test outbox delivery safety on same disposable database
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/outbox-postgres.sql
+      - name: Test durable cleanup queue on same disposable database
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/cleanup-postgres.sql
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
