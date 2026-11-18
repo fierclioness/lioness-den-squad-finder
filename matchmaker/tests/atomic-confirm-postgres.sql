@@ -61,7 +61,7 @@ begin
  then raise exception 'Fixture one did not close cleanly'; end if;
  if matchmaker_internal.close_with_post_guard(owner2)<>'closed_without_post'
  then raise exception 'Fixture two did not close cleanly'; end if;
-end $;
+end $$;
 RESET ROLE;
 drop trigger test_reject_confirm_enqueue on matchmaker_internal.post_outbox;
 drop function pg_temp.reject_enqueue();
