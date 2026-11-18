@@ -1,0 +1,42 @@
+name: Den Matchmaker Postgres integration
+on:
+  pull_request:
+    paths:
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-postgres.yml'
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-postgres.yml'
+permissions:
+  contents: read
+jobs:
+  postgres-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: testonly
+          POSTGRES_DB: matchmaker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d matchmaker_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: testonly
+      PGDATABASE: matchmaker_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Test proposed SQL on ephemeral PostgreSQL only
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/postgres-smoke.sql
