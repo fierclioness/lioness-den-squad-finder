@@ -42,7 +42,7 @@ export function makeMatchmakerDispatcher({store}){
    }
    const result=await store.confirm(actor,match[2]);
    if(result?.publicPostCreated!==false)throw Error("Unexpected posting behavior");
-   return {content:"Saved to the test model. Nothing was posted to Discord."};
+   return {content:"Your squad request was saved privately. Nothing was posted to Discord because publishing is not enabled."};
   }
   return {content:"Unsupported action."};
  };
