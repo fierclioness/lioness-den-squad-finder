@@ -22,7 +22,7 @@ export function markPostFailure(row,{workerId,now=Date.now(),definitelyNotPosted
  // A timeout or 5xx is ambiguous: do not automatically retry. Discord may have posted!
  return {...row,state:definitelyNotPosted?"failed":"uncertain",updatedAt:now,workerId:null,lastError:String(reason).slice(0,200)};
 }
-export function cancelOutbox(row,{now=Date.now()}){
+export function cancelOutbox(row,{now=Date.now()}={}){
  if(row.state==="posted"||row.state==="sending"||row.state==="uncertain")
   throw Error("May already be published; reconcile Discord before closing");
  if(row.state!=="pending"&&row.state!=="failed")throw Error("Cannot cancel");
