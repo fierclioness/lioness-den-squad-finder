@@ -57,6 +57,14 @@ export function makeTransactionalMock({clock=()=>Date.now()}={}){
       return {listing:listings.get(id),publicPostCreated:false};
     });
   }
+  function cancel(actor,token) {
+    const id=assertActor(actor);
+    const p=previews.get(token);
+    if(!p || p.ownerId!==id || p.guildId!==GUILD_ID || p.consumed)
+      throw new Error("Preview not found, used, or not yours");
+    previews.delete(token);
+    return {cancelled:true};
+  }
   async function close(actor) {
     const id=assertActor(actor);
     return locked(id,async()=>{
@@ -88,5 +96,5 @@ export function makeTransactionalMock({clock=()=>Date.now()}={}){
       return true;
     });
   }
-  return Object.freeze({preview,confirm,close,mine,list,acceptInteraction});
+  return Object.freeze({preview,confirm,cancel,close,mine,list,acceptInteraction});
 }
