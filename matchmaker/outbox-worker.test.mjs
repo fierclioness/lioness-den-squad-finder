@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {makeOutboxWorker} from "./outbox-worker.mjs";
 const listing={post_reference:"5d6e21e8-2637-4f6d-91b6-a51549a087e5",game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Saturday evening"};
 const workerId="11111111-1111-4111-8111-111111111111";
-const create=(query,sendMessage,enabled=true)=>makeOutboxWorker({query,sendMessage,enabled,newWorkerId:()=>workerId});
+const channelId="1546529497925296199",botUserId="1546529501859815439";
+const create=(query,sendMessage,enabled=true)=>makeOutboxWorker({query,sendMessage,enabled,channelId,botUserId,newWorkerId:()=>workerId});
 test("disabled worker neither claims nor sends",async()=>{
  let calls=0;const worker=create(async()=>{calls++;throw Error("query blocked");},async()=>{calls++;throw Error("send blocked");},false);
  assert.deepEqual(await worker.runOnce(),{status:"disabled"});assert.equal(calls,0);
@@ -14,7 +15,7 @@ test("posting requires verified Discord message ID and an atomic finish",async()
   sql.push({s,p});
   if(s.includes("claim_post"))return {rows:[{id:"12"}]};
   if(s.includes("squad_listings"))return {rows:[listing]};
-  if(s.includes("finish_post"))return {rows:[{ok:true}]};
+  if(s.includes("finish_post_with_receipt"))return {rows:[{result:"posted_active"}]};
   throw Error("Unexpected query");
  };
  let called=0;
@@ -23,12 +24,13 @@ test("posting requires verified Discord message ID and an atomic finish",async()
   assert.match(payload.content,/Looking for a squad/);
   assert.match(payload.content,/🔎 Den ref: 5d6e21e8-2637-4f6d-91b6-a51549a087e5/);
   assert.doesNotMatch(payload.content,/@everyone/);
-  return {confirmed:true,messageId:"1546529501859815438"};
+  return {confirmed:true,messageId:"1546529501859815438",channelId,botUserId};
  };
  const result=await create(query,transport).runOnce();
  assert.equal(result.status,"posted");assert.equal(called,1);
  assert.ok(sql.at(-1).s.includes("finish_post"));
  assert.equal(sql.at(-1).p[2],"1546529501859815438");
+ assert.deepEqual(sql.at(-1).p.slice(3),[channelId,botUserId]);
 });
 test("timeout or unknown result is quarantined, never treated as definitely unsent",async()=>{
  const seen=[];
@@ -58,9 +60,9 @@ test("confirmed delivery with failed database write raises without resending",as
  const query=async s=>{
   if(s.includes("claim_post"))return {rows:[{id:"12"}]};
   if(s.includes("squad_listings"))return {rows:[listing]};
-  if(s.includes("finish_post"))throw Error("database failure after send");
+  if(s.includes("finish_post_with_receipt"))throw Error("database failure after send");
  };
- const worker=create(query,async()=>{sends++;return {confirmed:true,messageId:"1546529501859815438"};});
+ const worker=create(query,async()=>{sends++;return {confirmed:true,messageId:"1546529501859815438",channelId,botUserId};});
  await assert.rejects(worker.runOnce(),/manual reconciliation/);
  assert.equal(sends,1);
 });
