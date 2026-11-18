@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {makeOutboxWorker} from "./outbox-worker.mjs";
-const listing={game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Saturday evening"};
+const listing={post_reference:"5d6e21e8-2637-4f6d-91b6-a51549a087e5",game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Saturday evening"};
 const workerId="11111111-1111-4111-8111-111111111111";
 const create=(query,sendMessage,enabled=true)=>makeOutboxWorker({query,sendMessage,enabled,newWorkerId:()=>workerId});
 test("disabled worker neither claims nor sends",async()=>{
@@ -21,6 +21,7 @@ test("posting requires verified Discord message ID and an atomic finish",async()
  const transport=async payload=>{
   called++;assert.deepEqual(payload.allowed_mentions,{parse:[]});
   assert.match(payload.content,/Looking for a squad/);
+  assert.match(payload.content,/🔎 Den ref: 5d6e21e8-2637-4f6d-91b6-a51549a087e5/);
   assert.doesNotMatch(payload.content,/@everyone/);
   return {confirmed:true,messageId:"1546529501859815438"};
  };
