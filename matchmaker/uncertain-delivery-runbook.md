@@ -8,7 +8,7 @@ When a Discord POST times out or a worker crashes, a message may exist even if t
 ## Operator checklist before a receipt can be restored
 1. Keep the outbox item `uncertain` or `sending` and block re-posting.
 2. Inspect the expected channel in the authorized guild. Discord history search can be incomplete: **absence alone cannot prove no delivery**.
-3. Obtain independent trusted binding between this specific listing and the actual bot-created Discord message. **Current message templates do not contain a reliable listing marker**, so this step is a launch blocker until a privacy-safe token or durable sent receipt is implemented.
+3. Match the authenticated bot-owned message's `🔎 Den ref: <UUID>` against the **unique random `post_reference` stored in the private listing row**. Verify that exactly one marker appears; game content, message timing, or a member ID are not evidence. This marker is non-identifying but publicly visible and should not be treated as a secret.
 4. Verify the message ID, actual channel and bot author through authenticated Discord API responses.
 5. Have an authorized reviewer record a case/ticket, exact evidence and decision without putting bot credentials or member private data in the ticket.
 6. Only then call the private reconciliation operation from a trusted server with audit metadata. If the listing was closed or expired, queue a verified bot-owned cleanup request. Never use a member-controlled approval field.
