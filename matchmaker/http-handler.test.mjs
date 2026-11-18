@@ -1,0 +1,54 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {generateKeyPairSync,sign} from "node:crypto";
+import {makeMatchmakerHttpHandler} from "./http-handler.mjs";
+const pair=generateKeyPairSync("ed25519");
+const hex=pair.publicKey.export({format:"der",type:"spki"}).subarray(-32).toString("hex");
+const now=1795032000000,ts=String(now/1000);
+let sequence=1546529501859815438n;
+function signed(obj,options={}){
+ const data={id:String(++sequence),...obj};
+ const raw=Buffer.from(JSON.stringify(data));
+ const signature=sign(null,Buffer.concat([Buffer.from(ts),raw]),pair.privateKey).toString("hex");
+ return new Request("https://example.invalid/functions/v1/den-matchmaker",{
+  method:"POST",
+  headers:{"x-signature-ed25519":options.badSignature?"00".repeat(64):signature,
+           "x-signature-timestamp":ts,"content-type":"application/json"},
+  body:raw
+ });
+}
+const guild_id="1546529497925296199",member={user:{id:"1418199180287148073"}};
+function fixture(overrides={}){
+ const replay=new Set();
+ return makeMatchmakerHttpHandler({publicKeyHex:hex,clock:()=>now,
+  claimReplay:async id=>{if(replay.has(id))return false;replay.add(id);return true;},...overrides});
+}
+test("only signed PING accepted; disabled endpoint makes no public post",async()=>{
+ const handle=fixture();
+ const ping=await handle(signed({type:1}));assert.equal(ping.status,200);assert.deepEqual(await ping.json(),{type:1});
+ const cmd=await handle(signed({type:2,guild_id,member,data:{name:"squad",options:[{name:"list"}]}}));
+ const body=await cmd.json();
+ assert.equal(body.data.flags,64);assert.match(body.data.content,/development/);
+ assert.deepEqual(body.data.allowed_mentions,{parse:[]});
+});
+test("unsigned, forged and invalid methods rejected",async()=>{
+ const handle=fixture();
+ assert.equal((await handle(new Request("https://example.invalid",{method:"GET"}))).status,405);
+ assert.equal((await handle(new Request("https://example.invalid",{method:"POST",body:"{}"}))).status,401);
+ assert.equal((await handle(signed({type:1},{badSignature:true}))).status,401);
+});
+test("cross-guild rejected and dispatcher cannot create non-ephemeral replies",async()=>{
+ let calls=0;
+ const handle=fixture({enabled:true,dispatch:async()=>{calls++;return {content:"Only a private response",flags:0};}});
+ const wrong=await (await handle(signed({type:2,guild_id:"999999999999999999",member,data:{name:"squad"}}))).json();
+ assert.equal(wrong.data.flags,64);
+ assert.equal(calls,0);
+ const good=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+ assert.equal(calls,1);
+ assert.equal(good.data.flags,64);
+ assert.equal(good.data.content,"Only a private response");
+});
+test("unavailable replay ledger denies valid signed request",async()=>{
+ const handle=makeMatchmakerHttpHandler({publicKeyHex:hex,clock:()=>now,claimReplay:async()=>{throw Error("db down");}});
+ assert.equal((await handle(signed({type:1}))).status,401);
+});
