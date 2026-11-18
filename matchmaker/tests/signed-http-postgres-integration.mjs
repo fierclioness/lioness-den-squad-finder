@@ -55,7 +55,7 @@ try {
  assert.doesNotMatch(body.data.content,/1418199180287148081/);
  assert.match((await (await handle(signed(cmd(member,"close")))).json()).data.content,/closed/);
  assert.match((await (await handle(signed(cmd(member,"mine")))).json()).data.content,/no active/i);
- const cancelPreview=await (await handle(signed(cmd(stranger,"create",Object.entries(values).map(([name,value])=>({name,value}))))).json();
+ const cancelPreview=await (await handle(signed(cmd(stranger,"create",createOptions)))).json();
  const tokenConfirm=cancelPreview.data.components[0].components[0].custom_id;
  const tokenCancel=cancelPreview.data.components[0].components[1].custom_id;
  assert.match((await (await handle(signed(click(stranger,tokenCancel)))).json()).data.content,/cancelled/);
