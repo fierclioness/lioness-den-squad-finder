@@ -48,8 +48,12 @@ export function makePostgresMatchmakerStore({query}){
   return true;
  }
  async function close(actor){
-  const row=await one("select matchmaker_internal.close_my_listing($1) as closed",[owner(actor)]);
-  return row?.closed===true;
+  const row=await one("select matchmaker_internal.close_with_post_guard($1) as outcome",[owner(actor)]);
+  if(typeof row?.outcome!=="string")throw Error("Close transition unavailable");
+  if(row.outcome==="not_active")return false;
+  if(!["closed_without_post","closed_delivery_unresolved","closed_cleanup_queued"].includes(row.outcome))
+   throw Error("Unexpected private close transition");
+  return true;
  }
  async function mine(actor){
   const row=await one(
