@@ -34,6 +34,16 @@
 
 Supabase staging security advisor reports INFO `rls_enabled_no_policy` on seven private RLS-protected tables. This is expected for deny-by-default private schema: **no public/anon/authenticated grants or RLS policies** are intentionally present. The advisor did not indicate a public RLS exposure in those results. New index unused notices are expected on an empty staging database.
 
+## Hosted HTTP smoke verified
+
+- Deployed staging-only Edge Function `den-matchmaker` **version 3** (9-file bundle). Added a public **static, read-only** health response, with no member data, secrets or DB writes.
+- Verified actual HTTPS from GitHub Actions runner in workflow **#44422240687, successful re-run**:
+  - `GET https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker/health` -> HTTP **200**, exact static JSON showing `environment=staging`, `commands_disabled`, `posting_enabled=false`.
+  - An **unsigned POST** to the staging command endpoint -> HTTP **503**, `{"error":"Not configured"}`, confirming the missing signing key/private database URL fail closed.
+  - Initial health test returned 503 because Supabase rewrites the function path. That was corrected to accept canonical Edge gateway routes; the re-run passed.
+- Rechecked staging private listing, post, cleanup and replay tables: **zero test rows**. Rechecked Den Missions production project: no Matchmaker tables.
+- **Important:** HTTP GET health verifies endpoint routing and availability only. Because staging signing and DB connection credentials are not yet provisioned, a real signed Discord PING and Edge-to-Postgres round trip **remain unverified**. Do not enable real Discord commands or posting without those checks.
+
 ## What is not yet verified
 
 - Actual HTTP invocation status/latency from a live client. External connectivity from the assistant environment could not reach the URL; Edge Function `ACTIVE` confirms deployment metadata, **not successful runtime invocation**.
