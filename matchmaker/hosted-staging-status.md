@@ -44,6 +44,14 @@ Supabase staging security advisor reports INFO `rls_enabled_no_policy` on seven 
 - Rechecked staging private listing, post, cleanup and replay tables: **zero test rows**. Rechecked Den Missions production project: no Matchmaker tables.
 - **Important:** HTTP GET health verifies endpoint routing and availability only. Because staging signing and DB connection credentials are not yet provisioned, a real signed Discord PING and Edge-to-Postgres round trip **remain unverified**. Do not enable real Discord commands or posting without those checks.
 
+## Staging Edge database configuration improved
+
+- Current deployed **staging-only Edge Function is version 5**, with updated typed Deno environment handling. It can use Supabase's automatically available **`SUPABASE_DB_URL`** without asking the user to create or paste another database password.
+- This default DB URL is permitted **ONLY when `SUPABASE_URL` exactly identifies the isolated staging project `tcxktyqywsqafnyxhpgy`**. Production Den Missions never falls back to its privileged default DB URL; a separately reviewed private connection is required there.
+- `DEN_MATCHMAKER_DATABASE_URL` remains an optional explicit least-privilege override. A real signed gateway test still requires a Discord **public signing key**, `DEN_MATCHMAKER_DISCORD_PUBLIC_KEY`, securely provisioned in staging through the Supabase project secrets UI.
+- The code and new production-isolation tests passed on commit `d9e715b05137b14e31f48b85ffc30bfaaafab61f`: JS run **#44423055528**, Deno and live staging HTTP smoke run **#44423055539**, and disposable Postgres run **#44423055509**.
+- **No real Edge→PostgreSQL request has been verified yet**, because the key is not configured and the signed gateway remains fail-closed. No Discord bot token, app configuration or public posting was introduced.
+
 ## What is not yet verified
 
 - Actual HTTP invocation status/latency from a live client. External connectivity from the assistant environment could not reach the URL; Edge Function `ACTIVE` confirms deployment metadata, **not successful runtime invocation**.
