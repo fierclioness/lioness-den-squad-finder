@@ -23,3 +23,10 @@ This is an architectural review for the existing *draft* Matchmaker. Nothing was
 Discord official API source: https://github.com/discord/discord-api-docs/blob/main/developers/resources/message.mdx
 
 **Not deployable yet:** The transport's `botOwned` precondition is a caller assertion; only an authoritative DB receipt plus Discord author verification can establish that in a real environment. Do not expose this module to members directly or treat it as launch-ready.
+
+
+## Verification hardening added
+
+- `verified-bot-cleanup.mjs` now retrieves the exact original message from the fixed channel, validates channel + message ID, and checks that Discord identifies the author as the expected bot before a delete request is permitted.
+- Its transport is DISABLED by default. A 204 deletion is success, 404 means missing, and any other status remains unresolved for reconciliation. Tests prove ordinary members' and other bots' messages are never deleted in the simulated transport.
+- The verified transport is still not wired to a durable cleanup outbox. It does not solve concurrent close-vs-post races, so scheduled cleanup remains a **release blocker**, not a finished launch feature.
