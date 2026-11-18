@@ -1,0 +1,26 @@
+name: Den Matchmaker Edge TypeScript check
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/den-matchmaker/**'
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-deno.yml'
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - 'supabase/functions/den-matchmaker/**'
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-deno.yml'
+permissions:
+  contents: read
+jobs:
+  deno-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge entrypoint (without any production connection)
+        run: deno check supabase/functions/den-matchmaker/index.ts
