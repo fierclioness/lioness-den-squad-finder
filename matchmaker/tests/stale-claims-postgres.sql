@@ -59,7 +59,7 @@ begin
  then raise exception 'Cleanup uncertainty missing'; end if;
  if matchmaker_internal.finish_cleanup(cleanup_id,worker1,true)
  then raise exception 'Expired cleanup owner could mark success'; end if;
- if matchmaker_internal.claim_cleanup(worker2) is not null
+ if matchmaker_internal.claim_cleanup(worker2) is not distinct from cleanup_id
  then raise exception 'Quarantined cleanup automatically retried'; end if;
  if matchmaker_internal.quarantine_stale_cleanup_claims()<>0
  then raise exception 'Cleanup quarantine not idempotent'; end if;
