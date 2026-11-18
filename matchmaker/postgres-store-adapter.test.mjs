@@ -1,0 +1,64 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {makePostgresMatchmakerStore} from "./postgres-store-adapter.mjs";
+import {makeMatchmakerDispatcher} from "./command-dispatcher.mjs";
+const actor={guildId:"1546529497925296199",memberId:"1418199180287148073"};
+const token="11111111-1111-4111-8111-111111111111";
+const draft={game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Saturday evening"};
+test("server-side adapter calls private parameterized RPCs without posting",async()=>{
+ const queries=[];
+ const query=async(sql,params)=>{
+  queries.push({sql,params});
+  if(sql.includes("prepare_preview"))return {rows:[{token}]};
+  if(sql.includes("confirm_preview"))return {rows:[{id:"27"}]};
+  if(sql.includes("cancel_preview"))return {rows:[{cancelled:true}]};
+  if(sql.includes("close_my_listing"))return {rows:[{closed:true}]};
+  if(sql.includes("claim_interaction"))return {rows:[{accepted:true}]};
+  return {rows:[]};
+ };
+ const store=makePostgresMatchmakerStore({query});
+ assert.deepEqual(await store.prepare(actor,draft),{token});
+ assert.deepEqual(await store.confirm(actor,token),{listingId:"27",publicPostCreated:false});
+ assert.equal(await store.cancel(actor,token),true);
+ assert.equal(await store.close(actor),true);
+ assert.equal(await store.claimReplay("1546529501859815438"),true);
+ assert.equal(await store.mine(actor),null);
+ assert.deepEqual(await store.list(actor),[]);
+ assert.equal(queries.length,7);
+ for(const {sql,params} of queries){
+  assert.match(sql,/matchmaker_internal/);
+  assert.ok(Array.isArray(params));
+  assert.doesNotMatch(sql,/1418199180287148073|Call of Duty/);
+  assert.doesNotMatch(sql,/SUPABASE_SERVICE_ROLE_KEY|discord\.com\/api/);
+ }
+ assert.deepEqual(queries[0].params,[actor.memberId,draft.game,draft.platform,draft.vibe,draft.mic,draft.timezone,draft.availability]);
+ assert.deepEqual(queries[1].params,[actor.memberId,token]);
+});
+test("owner identity, input and token are validated before database access",async()=>{
+ let count=0;
+ const store=makePostgresMatchmakerStore({query:async()=>{count++;return {rows:[]};}});
+ await assert.rejects(store.prepare({...actor,guildId:"999999999999999999"},draft),/verified Discord actor/);
+ await assert.rejects(store.prepare(actor,{...draft,game:"@everyone"}),/Mentions/);
+ await assert.rejects(store.confirm(actor,"not-a-token"),/Invalid preview token/);
+ await assert.rejects(store.claimReplay("not-a-snowflake"),/Invalid verified interaction ID/);
+ assert.equal(count,0);
+ assert.throws(()=>makePostgresMatchmakerStore({}),/query function/);
+});
+test("unavailable database fails closed and no fallback is used",async()=>{
+ const store=makePostgresMatchmakerStore({query:async()=>{throw Error("database unavailable");}});
+ await assert.rejects(store.claimReplay("1546529501859815438"),/database unavailable/);
+ await assert.rejects(store.prepare(actor,draft),/database unavailable/);
+});
+test("dispatcher interoperates with SQL adapter without publishing",async()=>{
+ const query=async(sql)=>{
+  if(sql.includes("prepare_preview"))return {rows:[{token}]};
+  if(sql.includes("confirm_preview"))return {rows:[{id:"28"}]};
+  return {rows:[]};
+ };
+ const dispatch=makeMatchmakerDispatcher({store:makePostgresMatchmakerStore({query})});
+ const fields=Object.entries(draft).map(([name,value])=>({name,value}));
+ const create=await dispatch({...actor,type:2,data:{name:"squad",options:[{name:"create",options:fields}]}});
+ assert.equal(create.buttons[0].token,token);
+ const response=await dispatch({...actor,type:3,data:{custom_id:"mm:confirm:"+token}});
+ assert.match(response.content,/Nothing was posted/);
+});
