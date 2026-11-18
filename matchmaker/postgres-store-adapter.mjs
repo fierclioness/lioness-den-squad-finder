@@ -36,9 +36,9 @@ export function makePostgresMatchmakerStore({query}){
  }
  async function confirm(actor,previewToken){
   const id=owner(actor),t=token(previewToken);
-  const row=await one("select matchmaker_internal.confirm_preview($1,$2::uuid) as id",[id,t]);
-  if(row?.id==null)throw Error("Confirmation did not create a listing");
-  // Posting must be a SEPARATE explicitly controlled outbox step, OFF by default.
+  const row=await one("select matchmaker_internal.confirm_and_enqueue($1,$2::uuid) as id",[id,t]);
+  if(row?.id==null)throw Error("Confirmation did not atomically queue a listing");
+  // Public posting remains DISABLED until a separately authorized worker is enabled.
   return {listingId:String(row.id),publicPostCreated:false};
  }
  async function cancel(actor,previewToken){
