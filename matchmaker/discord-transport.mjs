@@ -3,9 +3,9 @@
 // The target is an APPROVED GUILD TEXT CHANNEL (e.g., existing #squad-up), not a DM.
 const SNOW=/^\d{15,22}$/;
 const API="https://discord.com/api/v10";
-export function makeDiscordTransport({botToken,channelId,fetchFn=fetch,enabled=false}){
+export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch,enabled=false}){
  if(typeof enabled!=="boolean")throw Error("Invalid publish feature gate");
- if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))))
+ if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))||!SNOW.test(String(botUserId))))
   throw Error("Verified server-side bot credentials and destination required");
  if(typeof fetchFn!=="function")throw Error("Trusted transport fetch required");
  async function sendMessage({content,allowed_mentions}){
@@ -27,9 +27,10 @@ export function makeDiscordTransport({botToken,channelId,fetchFn=fetch,enabled=f
   if(!response.ok)throw Error("Delivery not confirmed");
   let data;
   try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
-  if(!data || !SNOW.test(String(data.id||"")) || String(data.channel_id)!==String(channelId))
+  if(!data || !SNOW.test(String(data.id||"")) || String(data.channel_id)!==String(channelId)||
+      String(data.author?.id)!==String(botUserId)||data.author?.bot!==true)
    throw Error("Untrusted delivery receipt");
-  return {confirmed:true,messageId:String(data.id)};
+  return {confirmed:true,messageId:String(data.id),channelId:String(data.channel_id),botUserId:String(data.author.id)};
  }
  return Object.freeze({sendMessage});
 }
