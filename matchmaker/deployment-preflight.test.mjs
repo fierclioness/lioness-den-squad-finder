@@ -28,7 +28,7 @@ test("missing keys, disabled TLS, malformed URLs and wrong guild rejected",()=>{
 });
 test("all gates are explicit, no assumed approval",()=>{
  const x=auditMatchmakerConfig({...valid,gatewayDeadlineTested:true,
- persistenceRuntimeTested:true,guildTestAccountPassed:true,messageReconciliationTested:true});
+ persistenceRuntimeTested:true,guildTestAccountPassed:true,messageReconciliationTested:true,privateSchemaReviewed:true,releaseApproved:true});
  assert.equal(x.readyForControlledTest,true);
  assert.equal(x.warnings.some(t=>t.includes("active")),false);
 });
