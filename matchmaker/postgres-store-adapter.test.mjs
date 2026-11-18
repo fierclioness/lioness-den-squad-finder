@@ -12,7 +12,7 @@ test("server-side adapter calls private parameterized RPCs without posting",asyn
   if(sql.includes("prepare_preview"))return {rows:[{token}]};
   if(sql.includes("confirm_preview"))return {rows:[{id:"27"}]};
   if(sql.includes("cancel_preview"))return {rows:[{cancelled:true}]};
-  if(sql.includes("close_my_listing"))return {rows:[{closed:true}]};
+  if(sql.includes("close_with_post_guard"))return {rows:[{outcome:"closed_cleanup_queued"}]};
   if(sql.includes("claim_interaction"))return {rows:[{accepted:true}]};
   return {rows:[]};
  };
