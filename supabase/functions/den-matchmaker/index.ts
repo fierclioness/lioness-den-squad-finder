@@ -6,7 +6,7 @@ import {makeMatchmakerServer} from "../../../matchmaker/server-composition.mjs";
 import {stagingHealthResponse} from "../../../matchmaker/staging-health.mjs";
 import {resolvePrivateDatabaseUrl} from "../../../matchmaker/staging-runtime-config.mjs";
 const key=Deno.env.get("DEN_MATCHMAKER_DISCORD_PUBLIC_KEY") ?? "";
-const url=resolvePrivateDatabaseUrl(name=>Deno.env.get(name));
+const url=resolvePrivateDatabaseUrl((name:string)=>Deno.env.get(name));
 const enabled=Deno.env.get("DEN_MATCHMAKER_COMMANDS_ENABLED")==="true";
 function unavailable():Response {
  return new Response(JSON.stringify({error:"Not configured"}),{status:503,
