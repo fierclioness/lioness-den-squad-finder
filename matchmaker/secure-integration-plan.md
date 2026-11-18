@@ -51,3 +51,16 @@ Member-facing messages should be short, welcoming and avoid promising real-time 
 No Supabase schema changes, deployed Edge Functions, Discord app installation, roles, member data, announcements or merge to `main` until authorized and tested. Discord app credentials and scheduler passwords (secret keys) must never be included in source control.
 
 Related: issue #1, draft PR #2. See official Discord interactions documentation for current response and signature rules.
+
+
+## Official API checks — November 18, 2026
+
+Discord requires an **initial response within three seconds**; a final real endpoint must acknowledge/defer promptly rather than hold the initial response while performing database writes or Discord posting. Interaction tokens can be used for follow-ups for 15 minutes. Responses must validate raw-body Ed25519 signatures with the two supplied signature headers, and must return HTTP 401 for invalid signatures.
+
+Discord source: https://github.com/discord/discord-api-docs/blob/main/developers/interactions/receiving-and-responding.mdx
+
+For a Discord-signed webhook hosted in Supabase Edge Functions, project-level JWT checks may need to be off because Discord does not send Supabase JWTs; instead the function **must** validate Discord's Ed25519 signature on every request before doing anything (including a PING response). The endpoint must not treat missing Supabase JWT verification as equivalent to a public open API.
+
+Supabase examples: https://supabase.com/docs/guides/functions/examples/discord-bot and https://supabase.com/docs/guides/functions/auth
+
+The current local adapter is a test harness. Its inline memory protection is NOT cross-instance and is not adequate for production.
