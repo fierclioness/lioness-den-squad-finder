@@ -2,6 +2,7 @@
 // Missing a message from a channel search does NOT prove it was never posted.
 // A receipt may be accepted only after verifying the exact original message,
 // destination and expected bot author; an operator must approve the action.
+import {verifyReferenceMatch} from "./listing-reference.mjs";
 const snow=/^\d{15,22}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function assessUncertainDelivery({listing,outbox,message,channelId,botUserId,operatorApproved=false}={}){
@@ -18,11 +19,10 @@ export function assessUncertainDelivery({listing,outbox,message,channelId,botUse
   return {decision:"block",reason:"Original Discord message identity not verified"};
  if(outbox.claimedBy!=null&&!uuid.test(String(outbox.claimedBy)))
   return {decision:"block",reason:"Untrusted worker claim"};
- // Listing identity is NOT established by content similarity or date alone.
- // A signed, private post token embedded by the bot, or a durable trusted
- // receipt binding, must be verified out of band before invoking a DB resolver.
- if(message.boundListingId==null||String(message.boundListingId)!==String(listing.id))
-  return {decision:"manual_review",reason:"Posting identity is not cryptographically or durably bound to this listing"};
+ // Only the original bot's authenticated message may supply this marker.
+ // The reference comes from private PostgreSQL, not a member ID or user input.
+ if(!verifyReferenceMatch(listing.post_reference,message.content))
+  return {decision:"manual_review",reason:"Bot message does not contain this listing's unique persisted reference"};
  if(operatorApproved!==true)
   return {decision:"approval_required",reason:"A verified receipt still requires explicit reconciliation approval"};
  return {decision:"record_confirmed_receipt",listingId:String(listing.id),
