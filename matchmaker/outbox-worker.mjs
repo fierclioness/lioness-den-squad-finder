@@ -25,10 +25,12 @@ function listingToMessage(listing){
   "\n🌎 "+out[4]+"\n🕒 "+out[5]+
   "\nUse the Den's #squad-up channel to connect. Listings expire after 36 hours.\n"+reference;
 }
-export function makeOutboxWorker({query,sendMessage,enabled=false,newWorkerId=()=>crypto.randomUUID()}){
+export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=false,newWorkerId=()=>crypto.randomUUID()}){
  if(typeof query!=="function")throw Error("Trusted database query required");
  if(typeof sendMessage!=="function")throw Error("Trusted Discord transport required");
  if(typeof enabled!=="boolean")throw Error("Invalid publish flag");
+ if(enabled && (!SNOW.test(String(channelId||""))||!SNOW.test(String(botUserId||""))))
+  throw Error("Trusted configured channel and bot identity required");
  async function call(sql,params){return row(await query(sql,params));}
  async function runOnce(){
   if(!enabled)return {status:"disabled"};
@@ -52,14 +54,16 @@ export function makeOutboxWorker({query,sendMessage,enabled=false,newWorkerId=()
    // sendMessage MUST use an audited destination, allow_mentions parse [], and
    // classify uncertain network failures conservatively.
    const sent=await sendMessage({content,allowed_mentions:{parse:[]}});
-   if(!sent||sent.confirmed!==true||!SNOW.test(String(sent.messageId||"")))
+   if(!sent||sent.confirmed!==true||!SNOW.test(String(sent.messageId||""))||
+      sent.channelId!==channelId || sent.botUserId!==botUserId)
     throw Error("Discord delivery could not be confirmed");
    confirmed=true;
    const done=await call(
-    "select matchmaker_internal.finish_post($1::bigint,$2::uuid,$3::text) as ok",
-    [listingId,workerId,String(sent.messageId)]);
-   if(done?.ok!==true)throw Error("Could not record Discord confirmation");
-   return {status:"posted",listingId,messageId:String(sent.messageId)};
+    "select matchmaker_internal.finish_post_with_receipt($1::bigint,$2::uuid,$3::text,$4::text,$5::text) as result",
+    [listingId,workerId,String(sent.messageId),channelId,botUserId]);
+   if(!["posted_active","posted_cleanup_queued"].includes(done?.result))
+    throw Error("Could not record trusted Discord receipt");
+   return {status:done.result==="posted_active"?"posted":"posted_cleanup_queued",listingId,messageId:String(sent.messageId)};
   }catch(error){
     // If confirmation was received but persisting it failed, DO NOT retry.
     // The row will remain "sending" and needs manual reconciliation.
