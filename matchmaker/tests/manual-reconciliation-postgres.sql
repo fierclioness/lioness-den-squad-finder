@@ -5,27 +5,27 @@ DO $$
 declare
  member text:='1418199180287148330';
  member2 text:='1418199180287148331';
- token uuid; id bigint; other bigint; worker uuid:='11111111-1111-4111-8111-111111111111';
+ token uuid; v_listing_key bigint; other bigint; worker uuid:='11111111-1111-4111-8111-111111111111';
  outcome text;
 begin
  token:=matchmaker_internal.prepare_preview(member,'COD','Xbox','Casual','Optional','ET','Friday');
- id:=matchmaker_internal.confirm_preview(member,token);
- perform matchmaker_internal.enqueue_post(id);
- if matchmaker_internal.claim_post(worker) is distinct from id then raise exception 'Claim failed'; end if;
- perform matchmaker_internal.fail_post(id,worker,false,'Network timeout: result unknown');
+ v_listing_key:=matchmaker_internal.confirm_preview(member,token);
+ perform matchmaker_internal.enqueue_post(v_listing_key);
+ if matchmaker_internal.claim_post(worker) is distinct from v_listing_key then raise exception 'Claim failed'; end if;
+ perform matchmaker_internal.fail_post(v_listing_key,worker,false,'Network timeout: result unknown');
  outcome:=matchmaker_internal.close_with_post_guard(member);
  if outcome<>'closed_delivery_unresolved'
  then raise exception 'Expected unresolved close, got %',outcome; end if;
- outcome:=matchmaker_internal.record_manual_receipt(id,'1546529501859815501',
+ outcome:=matchmaker_internal.record_manual_receipt(v_listing_key,'1546529501859815501',
    '1546529497925296199','1546529501859815438','ops-ticket-117',
    'Operator verified exact original Discord bot-owned message');
  if outcome<>'receipt_recorded_cleanup_queued' then raise exception 'Expected cleanup queue, got %',outcome; end if;
- if (select count(*) from matchmaker_internal.cleanup_outbox where listing_id=id)<>1
+ if (select count(*) from matchmaker_internal.cleanup_outbox where listing_id=v_listing_key)<>1
  then raise exception 'Expected exactly one cleanup request'; end if;
- if (select count(*) from matchmaker_internal.reconciliation_audit where listing_id=id)<>1
+ if (select count(*) from matchmaker_internal.reconciliation_audit where listing_id=v_listing_key)<>1
  then raise exception 'Expected one audit record'; end if;
  begin
-   perform matchmaker_internal.record_manual_receipt(id,'1546529501859815501',
+   perform matchmaker_internal.record_manual_receipt(v_listing_key,'1546529501859815501',
      '1546529497925296199','1546529501859815438','ops-ticket-117',
      'Repeated operator action should not succeed');
    raise exception 'Duplicate reconciliation should have failed';
