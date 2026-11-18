@@ -56,7 +56,12 @@ begin
  join matchmaker_internal.squad_listings s on s.id=o.listing_id
  where s.owner_discord_id=owner2;
  if outbox_count<>1 then raise exception 'Retry did not atomically enqueue'; end if;
-end $$;
+ -- Leave no pending fixture jobs for subsequent real-adapter publisher tests.
+ if matchmaker_internal.close_with_post_guard(owner1)<>'closed_without_post'
+ then raise exception 'Fixture one did not close cleanly'; end if;
+ if matchmaker_internal.close_with_post_guard(owner2)<>'closed_without_post'
+ then raise exception 'Fixture two did not close cleanly'; end if;
+end $;
 RESET ROLE;
 drop trigger test_reject_confirm_enqueue on matchmaker_internal.post_outbox;
 drop function pg_temp.reject_enqueue();
