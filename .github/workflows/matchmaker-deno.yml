@@ -31,6 +31,9 @@ jobs:
           set -euo pipefail
           test "$STAGING_URL" != "https://cpjcjcxinhjusosaguyi.supabase.co/functions/v1/den-matchmaker"
           code=$(curl --silent --show-error --max-time 20 --retry 2 --output /tmp/den_health.json --write-out '%{http_code}' "$STAGING_URL/health")
+          echo "Staging health HTTP status: $code"
+          head -c 350 /tmp/den_health.json || true
+          echo
           test "$code" = "200"
           python3 - <<'PY'
           import json
