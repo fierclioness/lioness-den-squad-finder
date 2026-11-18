@@ -1,0 +1,51 @@
+// Read-only deployment preflight: never connects, deploys or prints secrets.
+// 'readyForControlledTest' is NOT permission to enable a bot or migrate production.
+const SNOW=/^\d{15,22}$/;
+const KEY=/^[a-f0-9]{64}$/i;
+export function auditMatchmakerConfig(config) {
+  const errors=[],warnings=[];
+  if(!config || typeof config!=="object")return {ok:false,readyForControlledTest:false,errors:["Missing configuration"],warnings:[]};
+  const flag=config.commandsEnabled;
+  if(flag!==false&&flag!==true)errors.push("Command flag must be a boolean");
+  const publish=config.publishEnabled;
+  if(publish!==false&&publish!==true)errors.push("Publishing flag must be a boolean");
+  if(typeof config.publicKeyHex!=="string"||!KEY.test(config.publicKeyHex))
+    errors.push("Discord public key is missing or invalid");
+  if(typeof config.databaseUrl!=="string"||!/^postgres(?:ql)?:\/\//i.test(config.databaseUrl))
+    errors.push("A private PostgreSQL URL is not configured");
+  else{
+    let url;
+    try{url=new URL(config.databaseUrl);}catch{errors.push("Database URL is malformed");}
+    if(url){
+      if(url.username===""||url.password==="")errors.push("Database credentials are missing");
+      if(url.searchParams.get("sslmode")==="disable")errors.push("Database TLS must not be disabled");
+      if(url.hostname==="localhost"||url.hostname==="127.0.0.1")
+        warnings.push("Local PostgreSQL URL is not a hosted production connection");
+    }
+  }
+  if(config.guildId!=="1546529497925296199")errors.push("Unexpected Discord guild");
+  if(publish){
+    if(!SNOW.test(String(config.channelId||"")))errors.push("Discord destination channel ID required");
+    if(config.channelId===config.guildId)errors.push("Destination channel has not been independently identified");
+    if(typeof config.botToken!=="string"||config.botToken.length<20)
+      errors.push("Server-only Discord bot token required");
+    if(flag!==true)errors.push("Do not publish when user commands are disabled");
+  }
+  if(flag===true)warnings.push("User commands would be active; authorized test window required");
+  if(publish===true)warnings.push("Public posting would be active; verify channel permissions and rollback");
+  if(config.gatewayDeadlineTested!==true)
+    warnings.push("Three-second initial Discord response timing not verified in hosted environment");
+  if(config.persistenceRuntimeTested!==true)
+    warnings.push("Private PostgreSQL connection not verified in hosted Edge runtime");
+  if(config.guildTestAccountPassed!==true)
+    warnings.push("End-to-end authorized secondary account test not verified");
+  if(config.messageReconciliationTested!==true)
+    warnings.push("Timed-out post recovery and close/expiry message lifecycle not verified");
+  const operationalRequirements=[
+    config.gatewayDeadlineTested===true,
+    config.persistenceRuntimeTested===true,
+    config.guildTestAccountPassed===true,
+    config.messageReconciliationTested===true
+  ];
+  return {ok:errors.length===0,readyForControlledTest:errors.length===0&&operationalRequirements.every(Boolean),errors,warnings};
+}
