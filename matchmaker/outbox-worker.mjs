@@ -1,6 +1,7 @@
 // Review-only one-item Matchmaker publisher. NO built-in network API or bot token.
 // Production requires a trusted, injected Discord transport and audited feature gate.
 // Ambiguous delivery is quarantined, never automatically retried.
+import {markerFor} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 function row(result){
@@ -18,10 +19,11 @@ function listingToMessage(listing){
    throw Error("Unsafe listing value");
   return listing[k].replace(/[\r\n]/g," ");
  });
+ const reference=markerFor(listing.post_reference);
  return "👑 **Looking for a squad?**\n🎮 "+out[0]+"\n"+
   "🎯 "+out[1]+" · "+out[2]+"\n🎙️ "+out[3]+
   "\n🌎 "+out[4]+"\n🕒 "+out[5]+
-  "\nUse the Den's #squad-up channel to connect. Listings expire after 36 hours.";
+  "\nUse the Den's #squad-up channel to connect. Listings expire after 36 hours.\n"+reference;
 }
 export function makeOutboxWorker({query,sendMessage,enabled=false,newWorkerId=()=>crypto.randomUUID()}){
  if(typeof query!=="function")throw Error("Trusted database query required");
@@ -39,7 +41,7 @@ export function makeOutboxWorker({query,sendMessage,enabled=false,newWorkerId=()
   let confirmed=false;
   try {
    const listing=await call(
-    "select game,platform,vibe,mic,timezone,availability from matchmaker_internal.squad_listings where id=$1::bigint and status='active' and expires_at>clock_timestamp()",
+    "select game,platform,vibe,mic,timezone,availability,post_reference from matchmaker_internal.squad_listings where id=$1::bigint and status='active' and expires_at>clock_timestamp()",
     [listingId]);
    if(!listing){
      await call("select matchmaker_internal.fail_post($1::bigint,$2::uuid,$3::boolean,$4::text) as ok",
