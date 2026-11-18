@@ -39,7 +39,8 @@ try {
   claimReplay:store.claimReplay,
   dispatch:makeMatchmakerDispatcher({store})
  });
- let body=await (await handle(signed(cmd(member,"create",Object.entries(values).map(([name,value])=>({name,value}))))).json();
+ const createOptions=Object.entries(values).map(([name,value])=>({name,value}));
+ let body=await (await handle(signed(cmd(member,"create",createOptions)))).json();
  assert.equal(body.data.flags,64);assert.deepEqual(body.data.allowed_mentions,{parse:[]});
  assert.equal(body.data.components?.[0]?.components?.length,2);
  const confirm=body.data.components[0].components[0].custom_id;
