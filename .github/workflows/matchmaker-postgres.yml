@@ -50,6 +50,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/manual-reconciliation-postgres.sql
       - name: Test unique opaque reference on disposable listings
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/listing-reference-postgres.sql
+      - name: Test atomic confirm-and-enqueue with rollback safety
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/atomic-confirm-postgres.sql
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
