@@ -45,3 +45,14 @@ test("tampering, wrong guild and invalid inputs fail closed",async()=>{
  assert.equal(badFields.body.data.flags,64);
  assert.match(badFields.body.data.content,/Unable/);
 });
+
+
+test("cancel invalidates the preview and rejects a later confirm",async()=>{
+ const fresh=await app.handleSigned(command(other,"create",Object.entries(draft).map(([name,value])=>({name,value}))));
+ const confirmId=fresh.body.data.components[0].components[0].custom_id;
+ const cancelId=fresh.body.data.components[0].components[1].custom_id;
+ const cancelled=await app.handleSigned(click(other,cancelId));
+ assert.match(cancelled.body.data.content,/cancelled immediately/);
+ const later=await app.handleSigned(click(other,confirmId));
+ assert.match(later.body.data.content,/not found, used, or not yours/);
+});
