@@ -10,7 +10,7 @@ test("server-side adapter calls private parameterized RPCs without posting",asyn
  const query=async(sql,params)=>{
   queries.push({sql,params});
   if(sql.includes("prepare_preview"))return {rows:[{token}]};
-  if(sql.includes("confirm_preview"))return {rows:[{id:"27"}]};
+  if(sql.includes("confirm_and_enqueue"))return {rows:[{id:"27"}]};
   if(sql.includes("cancel_preview"))return {rows:[{cancelled:true}]};
   if(sql.includes("close_with_post_guard"))return {rows:[{outcome:"closed_cleanup_queued"}]};
   if(sql.includes("claim_interaction"))return {rows:[{accepted:true}]};
@@ -52,7 +52,7 @@ test("unavailable database fails closed and no fallback is used",async()=>{
 test("dispatcher interoperates with SQL adapter without publishing",async()=>{
  const query=async(sql)=>{
   if(sql.includes("prepare_preview"))return {rows:[{token}]};
-  if(sql.includes("confirm_preview"))return {rows:[{id:"28"}]};
+  if(sql.includes("confirm_and_enqueue"))return {rows:[{id:"28"}]};
   return {rows:[]};
  };
  const dispatch=makeMatchmakerDispatcher({store:makePostgresMatchmakerStore({query})});
