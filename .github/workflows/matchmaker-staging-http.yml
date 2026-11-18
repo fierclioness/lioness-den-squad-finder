@@ -1,0 +1,50 @@
+name: Den Matchmaker staging HTTP smoke (read only)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - '.github/workflows/matchmaker-staging-http.yml'
+      - 'supabase/functions/den-matchmaker/**'
+      - 'matchmaker/staging-health.mjs'
+permissions:
+  contents: read
+jobs:
+  staging-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify hosted staging health without authentication or DB writes
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          test "${STAGING_URL}" != "https://cpjcjcxinhjusosaguyi.supabase.co/functions/v1/den-matchmaker"
+          code=$(curl --silent --show-error --max-time 18 --retry 2 --output /tmp/den_health.json --write-out '%{http_code}' "${STAGING_URL}/health")
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_health.json') as f: data=json.load(f)
+          assert data == {
+              'service':'den-matchmaker',
+              'environment':'staging',
+              'status':'commands_disabled',
+              'posting_enabled':False,
+              'member_data_access':False
+          }, f'Unexpected staging health JSON: {data}'
+          print('PASS: real hosted staging health GET, no database writes')
+          PY
+      - name: Verify unsigned POST fails closed without secrets
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --max-time 18 --output /tmp/den_noauth.json --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$STAGING_URL")
+          test "$code" = "503"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_noauth.json') as f: data=json.load(f)
+          assert data.get('error') == 'Not configured', data
+          print('PASS: unsigned POST rejected; staging commands cannot run')
+          PY
