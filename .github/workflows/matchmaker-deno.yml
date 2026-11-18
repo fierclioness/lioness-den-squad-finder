@@ -24,3 +24,30 @@ jobs:
           deno-version: v2.x
       - name: Type-check Edge entrypoint (without any production connection)
         run: deno check supabase/functions/den-matchmaker/index.ts
+      - name: Real hosted staging HTTP smoke (no secrets or writes)
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          test "$STAGING_URL" != "https://cpjcjcxinhjusosaguyi.supabase.co/functions/v1/den-matchmaker"
+          code=$(curl --silent --show-error --max-time 20 --retry 2 --output /tmp/den_health.json --write-out '%{http_code}' "$STAGING_URL/health")
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_health.json') as f: data=json.load(f)
+          assert data == {'service':'den-matchmaker','environment':'staging','status':'commands_disabled','posting_enabled':False,'member_data_access':False}, data
+          print('Real hosted staging HTTP health passed, no database writes')
+          PY
+      - name: Verify unsigned staging POST is rejected
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --max-time 20 --output /tmp/den_noauth.json --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$STAGING_URL")
+          test "$code" = "503"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_noauth.json') as f: data=json.load(f)
+          assert data.get('error') == 'Not configured', data
+          print('Unsigned POST rejected; command endpoint remains disabled')
+          PY
