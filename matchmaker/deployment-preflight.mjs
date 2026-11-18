@@ -41,11 +41,17 @@ export function auditMatchmakerConfig(config) {
     warnings.push("End-to-end authorized secondary account test not verified");
   if(config.messageReconciliationTested!==true)
     warnings.push("Timed-out post recovery and close/expiry message lifecycle not verified");
+  if(config.privateSchemaReviewed!==true)
+    warnings.push("Private schema permissions and production migration not approved");
+  if(config.releaseApproved!==true)
+    warnings.push("No explicit controlled release approval recorded");
   const operationalRequirements=[
     config.gatewayDeadlineTested===true,
     config.persistenceRuntimeTested===true,
     config.guildTestAccountPassed===true,
-    config.messageReconciliationTested===true
+    config.messageReconciliationTested===true,
+    config.privateSchemaReviewed===true,
+    config.releaseApproved===true
   ];
   return {ok:errors.length===0,readyForControlledTest:errors.length===0&&operationalRequirements.every(Boolean),errors,warnings};
 }
