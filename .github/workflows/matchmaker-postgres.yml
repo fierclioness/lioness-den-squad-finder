@@ -49,3 +49,5 @@ jobs:
         run: npm install --no-save --package-lock=false --ignore-scripts pg@8.16.3
       - name: Test actual parameterized store adapter against disposable PostgreSQL
         run: node matchmaker/tests/postgres-store-integration.mjs
+      - name: Test signed Discord HTTP to isolated PostgreSQL roundtrip
+        run: node matchmaker/tests/signed-http-postgres-integration.mjs
