@@ -24,7 +24,6 @@ begin
  -- Force a *test-only* insert failure. Since the RPC is a single DB
  -- transaction, the listing and preview consumption must BOTH roll back.
  token2:=matchmaker_internal.prepare_preview(owner2,'COD','PC','Casual','Optional','ET','Saturday');
- create temporary table ephemeral_failure_probe(note text) on commit drop;
  -- No permanent triggers / schema objects are used for failure injection.
  -- Create a temporary function in pg_temp to intercept insert and fail.
  execute $ddl$
