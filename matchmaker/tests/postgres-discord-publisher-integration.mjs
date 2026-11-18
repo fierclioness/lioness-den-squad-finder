@@ -23,10 +23,10 @@ try {
  assert.equal(queued.rows[0].queued,true);
  const again=await query("select matchmaker_internal.enqueue_post($1::bigint) as queued",[listing.listingId]);
  assert.equal(again.rows[0].queued,false);
- const channelId="1546529497925296199",messageId="1546529501859815438";
+ const channelId="1546529497925296199",botUserId="1546529501859815439",messageId="1546529501859815438";
  let apiCalls=0;
  const transport=makeDiscordTransport({enabled:true,
-  botToken:"testing-only-not-real-token-0123456",channelId,
+  botToken:"testing-only-not-real-token-0123456",channelId,botUserId,
   fetchFn:async(url,options)=>{
     apiCalls++;
     assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages");
@@ -35,10 +35,10 @@ try {
     assert.match(payload.content,/Call of Duty/);
     const expected=(await query("select post_reference::text as ref from matchmaker_internal.squad_listings where id=$1::bigint",[listing.listingId])).rows[0].ref;
     assert.match(payload.content,new RegExp("🔎 Den ref: "+expected));
-    return {ok:true,json:async()=>({id:messageId,channel_id:channelId})};
+    return {ok:true,json:async()=>({id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}})};
   }
  });
- const publisher=makeOutboxWorker({enabled:true,query,sendMessage:transport.sendMessage,
+ const publisher=makeOutboxWorker({enabled:true,query,sendMessage:transport.sendMessage,channelId,botUserId,
   newWorkerId:()=>"11111111-1111-4111-8111-111111111111"});
  const done=await publisher.runOnce();
  assert.equal(done.status,"posted");
@@ -48,13 +48,15 @@ try {
  assert.equal(apiCalls,1);
  const row=(await query("select state,posted_message_id,attempts from matchmaker_internal.post_outbox where listing_id=$1::bigint",[listing.listingId])).rows[0];
  assert.equal(row.state,"posted");assert.equal(row.posted_message_id,messageId);assert.equal(row.attempts,1);
+ const original=(await query("select discord_message_id,channel_id,bot_user_id from matchmaker_internal.post_receipts where listing_id=$1",[listing.listingId])).rows[0];
+ assert.deepEqual(original,{discord_message_id:messageId,channel_id:channelId,bot_user_id:botUserId});
 
  // Second listing: timeout goes UNCERTAIN; worker must not resend it.
  const p2=await store.prepare({guildId:actor.guildId,memberId:"1418199180287148191"},draft);
  const second=await store.confirm({guildId:actor.guildId,memberId:"1418199180287148191"},p2.token);
  await query("select matchmaker_internal.enqueue_post($1::bigint)",[second.listingId]);
  let attempts=0;
- const ambiguous=makeOutboxWorker({enabled:true,query,
+ const ambiguous=makeOutboxWorker({enabled:true,query,channelId,botUserId,
   newWorkerId:()=>"22222222-2222-4222-8222-222222222222",
   sendMessage:async()=>{attempts++;throw Error("Connection timed out after request sent");}
  });
