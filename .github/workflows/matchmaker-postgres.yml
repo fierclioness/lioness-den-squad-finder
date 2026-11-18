@@ -51,3 +51,5 @@ jobs:
         run: node matchmaker/tests/postgres-store-integration.mjs
       - name: Test signed Discord HTTP to isolated PostgreSQL roundtrip
         run: node matchmaker/tests/signed-http-postgres-integration.mjs
+      - name: Test outbox persistence with mocked Discord posting
+        run: node matchmaker/tests/postgres-discord-publisher-integration.mjs
