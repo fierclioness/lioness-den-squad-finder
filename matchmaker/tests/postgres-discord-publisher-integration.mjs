@@ -20,7 +20,7 @@ try {
  const listing=await store.confirm(actor,preview.token);
  assert.equal(listing.publicPostCreated,false);
  const queued=await query("select matchmaker_internal.enqueue_post($1::bigint) as queued",[listing.listingId]);
- assert.equal(queued.rows[0].queued,true);
+ assert.equal(queued.rows[0].queued,false); // Already queued in same confirmation transaction.
  const again=await query("select matchmaker_internal.enqueue_post($1::bigint) as queued",[listing.listingId]);
  assert.equal(again.rows[0].queued,false);
  const channelId="1546529497925296199",botUserId="1546529501859815439",messageId="1546529501859815438";
@@ -54,7 +54,8 @@ try {
  // Second listing: timeout goes UNCERTAIN; worker must not resend it.
  const p2=await store.prepare({guildId:actor.guildId,memberId:"1418199180287148191"},draft);
  const second=await store.confirm({guildId:actor.guildId,memberId:"1418199180287148191"},p2.token);
- await query("select matchmaker_internal.enqueue_post($1::bigint)",[second.listingId]);
+ const duplicateSecond=await query("select matchmaker_internal.enqueue_post($1::bigint) as queued",[second.listingId]);
+ assert.equal(duplicateSecond.rows[0].queued,false);
  let attempts=0;
  const ambiguous=makeOutboxWorker({enabled:true,query,channelId,botUserId,
   newWorkerId:()=>"22222222-2222-4222-8222-222222222222",
