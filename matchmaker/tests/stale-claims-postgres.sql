@@ -46,7 +46,7 @@ begin
  -- A deleted-but-unacknowledged cleanup must not auto-delete twice.
  -- Existing earlier test created a posted, closed listing with a cleanup job.
  select listing_id into cleanup_id from matchmaker_internal.cleanup_outbox
- where state='pending' order by listing_id limit 1;
+ where state='pending' order by updated_at,listing_id limit 1;
  if cleanup_id is null then raise exception 'Missing prior cleanup fixture'; end if;
  if matchmaker_internal.claim_cleanup(worker1) is distinct from cleanup_id
  then raise exception 'Cleanup claim failed'; end if;
