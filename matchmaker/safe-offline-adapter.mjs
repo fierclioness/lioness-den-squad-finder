@@ -54,8 +54,8 @@ export function makeSafeOfflineAdapter({publicKeyHex,clock=()=>Date.now()}){
       const match=/^mm:(confirm|cancel):([0-9a-f-]{36})$/i.exec(signed.data.custom_id);
       if(!match)return response("Unknown button.");
       if(match[1]==="cancel"){
-        // Confirmed preview not created; simply no posting.
-        return response("No squad listing was posted. Your preview will expire automatically.");
+        storage.cancel(actor,match[2]);
+        return response("Preview cancelled immediately. No squad listing was posted.");
       }
       const result=await storage.confirm(actor,match[2]);
       return response(result.publicPostCreated?"Published.":"Saved to the test model. No Discord message was posted.");
