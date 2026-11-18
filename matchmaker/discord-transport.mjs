@@ -1,0 +1,35 @@
+// Review-only Discord REST message transport.
+// Server-side only. Nothing sends until a trusted caller explicitly invokes sendMessage.
+// The target is an APPROVED GUILD TEXT CHANNEL (e.g., existing #squad-up), not a DM.
+const SNOW=/^\d{15,22}$/;
+const API="https://discord.com/api/v10";
+export function makeDiscordTransport({botToken,channelId,fetchFn=fetch,enabled=false}){
+ if(typeof enabled!=="boolean")throw Error("Invalid publish feature gate");
+ if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))))
+  throw Error("Verified server-side bot credentials and destination required");
+ if(typeof fetchFn!=="function")throw Error("Trusted transport fetch required");
+ async function sendMessage({content,allowed_mentions}){
+  if(!enabled)throw Error("Discord publishing disabled");
+  if(typeof content!=="string"||content.length<1||content.length>1800)
+   throw Error("Invalid message content");
+  // Enforce no mentions regardless of what the caller supplies.
+  if(!allowed_mentions || JSON.stringify(allowed_mentions)!==JSON.stringify({parse:[]}))
+   throw Error("Mentions must be disabled");
+  // Avoid accidental public pings due to formatting or malicious field strings.
+  if(/@everyone|@here|<@!?[0-9]+>|<@&[0-9]+>/i.test(content))
+   throw Error("Unsafe Discord mention");
+  const response=await fetchFn(API+"/channels/"+channelId+"/messages",{
+   method:"POST",
+   headers:{"authorization":"Bot "+botToken,"content-type":"application/json"},
+   body:JSON.stringify({content,allowed_mentions:{parse:[]}})
+  });
+  // Any non-2xx response is marked ambiguous by the worker; do not blindly retry.
+  if(!response.ok)throw Error("Delivery not confirmed");
+  let data;
+  try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
+  if(!data || !SNOW.test(String(data.id||"")) || String(data.channel_id)!==String(channelId))
+   throw Error("Untrusted delivery receipt");
+  return {confirmed:true,messageId:String(data.id)};
+ }
+ return Object.freeze({sendMessage});
+}
