@@ -51,13 +51,13 @@ test("publication preview requires explicit consent and matching store flag",asy
  };
  assert.throws(()=>makeMatchmakerDispatcher({store,publishingEnabled:"true"}),/flag/);
  const privateDispatch=makeMatchmakerDispatcher({store});
- await assert.rejects(privateDispatch(click(actor,"mm:confirm:"+token)),/consent/);
+ await assert.rejects(privateDispatch(click(actor,"mm:confirm:"+token+":private")),/consent/);
  const publicDispatch=makeMatchmakerDispatcher({store,publishingEnabled:true});
  const opts=Object.entries(draft).map(([name,value])=>({name,value}));
  const preview=await publicDispatch(command(actor,"create",opts));
  assert.match(preview.content,/PUBLIC posting/);
  assert.equal(preview.buttons[0].label,"Post to #squad-up");
- assert.match((await publicDispatch(click(actor,"mm:confirm:"+token))).content,/queued for posting/);
+ assert.match((await publicDispatch(click(actor,"mm:confirm:"+token+":public"))).content,/queued for posting/);
 });
 
 test("old private preview cannot be published after flag switches",async()=>{
