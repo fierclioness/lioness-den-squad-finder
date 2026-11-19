@@ -79,3 +79,52 @@ test("rejected asynchronous observer does not fail or retry the interaction",asy
  assert.equal((await probe(new Request("https://example.invalid"))).status,200);
  await Promise.resolve();
 });
+
+test("unavailable clock at request start never prevents a signed acknowledgement",async()=>{
+ let calls=0,observations=0;
+ const probe=makeResponseTimingProbe({
+  handler:async()=>{calls++;return new Response(JSON.stringify({type:1}),{status:200});},
+  clock:()=>{throw Error("metrics clock unavailable");},
+  onResult:()=>{observations++;}
+ });
+ const response=await probe(new Request("https://example.invalid"));
+ assert.deepEqual(await response.json(),{type:1});
+ assert.equal(calls,1);
+ assert.equal(observations,0,"Do not fabricate a latency measurement");
+});
+
+test("clock throwing after dispatch does not replace an acknowledged Discord response",async()=>{
+ let ticks=0,observations=0;
+ const probe=makeResponseTimingProbe({
+  handler:async()=>new Response("ACK",{status:200}),
+  clock:()=>{if(++ticks===1)return 100;throw Error("clock died after dispatch");},
+  onResult:()=>{observations++;}
+ });
+ assert.equal(await (await probe(new Request("https://example.invalid"))).text(),"ACK");
+ assert.equal(ticks,2);
+ assert.equal(observations,0);
+});
+
+test("clock failures never mask the original handler exception",async()=>{
+ let calls=0;
+ const probe=makeResponseTimingProbe({
+  handler:async()=>{calls++;throw Error("Original database failure");},
+  clock:()=>{throw Error("telemetry crashed");},
+  onResult:()=>{throw Error("should not be called");}
+ });
+ await assert.rejects(probe(new Request("https://example.invalid")),/Original database failure/);
+ assert.equal(calls,1);
+});
+
+test("non-finite and backwards timestamps do not fabricate latency or fail ACK",async()=>{
+ for(const readings of [[Number.NaN,50],[20,Number.POSITIVE_INFINITY],[100,99]]){
+  let index=0,reports=0;
+  const probe=makeResponseTimingProbe({
+   handler:async()=>new Response("ACK"),
+   clock:()=>readings[index++],
+   onResult:()=>{reports++;}
+  });
+  assert.equal((await probe(new Request("https://example.invalid"))).status,200);
+  assert.equal(reports,0);
+ }
+});
