@@ -73,3 +73,13 @@ test("old private preview cannot be published after flag switches",async()=>{
  assert.match(oldButton.content,/no longer available/);
  assert.equal(confirms,0);
 });
+
+test("old public preview cannot confirm after publishing is disabled",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ let confirms=0;
+ const store={prepare:async()=>({token}),confirm:async()=>{confirms++;return {publicPostCreated:false,queuedForPublishing:false};},cancel:async()=>true,mine:async()=>null,list:async()=>[],close:async()=>false};
+ const privateDispatcher=makeMatchmakerDispatcher({store,publishingEnabled:false});
+ const result=await privateDispatcher(click(actor,"mm:confirm:"+token+":public"));
+ assert.match(result.content,/settings changed/);
+ assert.equal(confirms,0);
+});
