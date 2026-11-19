@@ -3,11 +3,13 @@
 // The target is an APPROVED GUILD TEXT CHANNEL (e.g., existing #squad-up), not a DM.
 const SNOW=/^\d{15,22}$/;
 const API="https://discord.com/api/v10";
-export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch,enabled=false}){
+export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch,enabled=false,requestTimeoutMs=5000}){
  if(typeof enabled!=="boolean")throw Error("Invalid publish feature gate");
  if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))||!SNOW.test(String(botUserId))))
   throw Error("Verified server-side bot credentials and destination required");
  if(typeof fetchFn!=="function")throw Error("Trusted transport fetch required");
+ if(!Number.isInteger(requestTimeoutMs)||requestTimeoutMs<10||requestTimeoutMs>15000)
+  throw Error("Bounded request timeout required");
  async function sendMessage({content,allowed_mentions}){
   if(!enabled)throw Error("Discord publishing disabled");
   if(typeof content!=="string"||content.length<1||content.length>1800)
@@ -21,7 +23,10 @@ export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch
   const response=await fetchFn(API+"/channels/"+channelId+"/messages",{
    method:"POST",
    headers:{"authorization":"Bot "+botToken,"content-type":"application/json"},
-   body:JSON.stringify({content,allowed_mentions:{parse:[]}})
+   body:JSON.stringify({content,allowed_mentions:{parse:[]}}),
+   // Aborts only the HTTP attempt; delivery may already have happened.
+   // The outbox MUST quarantine this as UNCERTAIN, never automatically resend.
+   signal:AbortSignal.timeout(requestTimeoutMs)
   });
   // Any non-2xx response is marked ambiguous by the worker; do not blindly retry.
   if(!response.ok)throw Error("Delivery not confirmed");
