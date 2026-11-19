@@ -10,7 +10,7 @@ const receipt=()=>({
  receipt_message_id:messageId,receipt_channel_id:channelId,receipt_bot_user_id:botUserId,
  listing_status:"closed",expires_at:"2026-12-01T00:00:00.000Z"
 });
-function fixture({rec=receipt(),remove=async()=>({status:"deleted"}),failFinish=false}={}){
+function fixture({rec=receipt(),remove=async()=>({status:"deleted"}),failFinish=false,throwFinish=false}={}){
  let claimed=false,finished=[],selected=0,claims=0;
  const query=async(sql,params)=>{
   if(sql.includes("claim_cleanup")){
@@ -25,6 +25,7 @@ function fixture({rec=receipt(),remove=async()=>({status:"deleted"}),failFinish=
   }
   if(sql.includes("finish_cleanup")){
    finished.push(params);
+   if(throwFinish)throw Error("private database unavailable");
    return {rows:[{ok:!failFinish}]};
   }
   throw Error("Unexpected SQL");
@@ -90,4 +91,28 @@ test("verified post already absent is terminal; failed DB persistence requires m
  const failed=fixture({failFinish:true,remove:async()=>({status:"deleted"})});
  await assert.rejects(failed.worker.runOnce(),/operator reconciliation required/);
  assert.deepEqual(failed.state().finished,[["8",workerId,true]]);
+});
+
+test("failed quarantine acknowledgement never reports success or retries finish",async()=>{
+ for(const options of [{failFinish:true},{throwFinish:true}]){
+  let deletes=0;
+  const fx=fixture({...options,rec:null,remove:async()=>{
+   deletes++;return {status:"deleted"};
+  }});
+  await assert.rejects(fx.worker.runOnce(),/Cleanup ledger state unconfirmed; manual reconciliation required/);
+  assert.equal(deletes,0,"untrusted original receipt must never trigger Discord deletion");
+  assert.deepEqual(fx.state().finished,[["8",workerId,false]],
+   "one failed database quarantine must not trigger a speculative second write");
+ }
+});
+test("uncertain Discord deletion with failed quarantine acknowledgement requires manual review",async()=>{
+ for(const options of [{failFinish:true},{throwFinish:true}]){
+  let deletes=0;
+  const fx=fixture({...options,remove:async()=>{
+   deletes++;throw Error("timeout after Discord DELETE request");
+  }});
+  await assert.rejects(fx.worker.runOnce(),/Cleanup ledger state unconfirmed; manual reconciliation required/);
+  assert.equal(deletes,1,"ambiguous Discord DELETE is never retried");
+  assert.deepEqual(fx.state().finished,[["8",workerId,false]]);
+ }
 });
