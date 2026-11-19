@@ -29,6 +29,9 @@ try {
   assert.equal(await store.mine(actor),null);
   const confirmed=await store.confirm(actor,preview.token);
   assert.equal(confirmed.publicPostCreated,false);
+  assert.equal(confirmed.queuedForPublishing,false);
+  const postQueue=(await client.query("select count(*)::int as n from matchmaker_internal.post_outbox where listing_id=$1",[confirmed.listingId])).rows[0];
+  assert.equal(postQueue.n,0,"A privately saved request must never enter the public queue");
   assert.match(confirmed.listingId,/^\d+$/);
   const mine=await store.mine(actor);
   assert.equal(mine.game,"Call of Duty");
