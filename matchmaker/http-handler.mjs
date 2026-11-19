@@ -37,7 +37,9 @@ async function readLimitedBody(request){
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
 const ephemeral=content=>({type:4,data:{flags:64,content,allowed_mentions:{parse:[]}}});
-export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,clock=()=>Date.now()}){
+export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,allowedTesterIds=null,clock=()=>Date.now()}){
+ if(allowedTesterIds!==null && (!(allowedTesterIds instanceof Set)||[...allowedTesterIds].some(id=>!SNOWFLAKE.test(String(id)))))
+  throw Error("Invalid tester allowlist");
  const verifier=makeDiscordVerifier({publicKeyHex,claimReplay,clock});
  return async function handle(request){
   if(request.method!=="POST")return json({error:"Method not allowed"},405);
@@ -57,6 +59,8 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   if(interaction.guild_id!==GUILD ||
      !SNOWFLAKE.test(String(interaction.member?.user?.id||"")))
    return json(ephemeral("The Den Matchmaker is for Lioness Den members only."));
+  if(allowedTesterIds!==null && !allowedTesterIds.has(String(interaction.member.user.id)))
+   return json(ephemeral("Den Matchmaker is currently limited to authorized testers."));
   if(!enabled || typeof dispatch!=="function")
    return json(ephemeral("Den Matchmaker is in development. The current Squad Finder is available."));
   // Restrict any future dispatcher to explicitly recognized signed command types.
