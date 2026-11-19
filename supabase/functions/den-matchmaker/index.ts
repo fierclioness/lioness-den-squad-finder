@@ -1,5 +1,5 @@
 // STAGING only: deployed on isolated Matchmaker project. Never activate production without review.
-// No Discord bot token, public posting, real commands or member changes.
+// No Discord bot token, public posting or member changes. Commands require server-only feature gates.
 // Discord webhook needs JWT handling reviewed; raw Ed25519 validation is mandatory.
 import pg from "npm:pg@8.16.3";
 import {makeMatchmakerServer} from "../../../matchmaker/server-composition.mjs";
@@ -17,8 +17,10 @@ function unavailable():Response {
  return new Response(JSON.stringify({error:"Not configured"}),{status:503,
   headers:{"content-type":"application/json","cache-control":"no-store"}});
 }
-if(!/^[a-f0-9]{64}$/i.test(key)||!/^(postgresql|postgres):\/\//.test(url)||(enabled&&!testerAllowlistValid)){
- Deno.serve((request:Request)=>stagingHealthResponse(request)??unavailable());
+const configured=/^[a-f0-9]{64}$/i.test(key)&&/^(postgresql|postgres):\/\//.test(url)&&
+  (!enabled||testerAllowlistValid);
+if(!configured){
+ Deno.serve((request:Request)=>stagingHealthResponse(request,{commandsEnabled:enabled,configured:false})??unavailable());
 }else{
  const pool=new pg.Pool({connectionString:url,max:1,connectionTimeoutMillis:1000,
   idleTimeoutMillis:1000,ssl:{rejectUnauthorized:true}});
@@ -28,5 +30,7 @@ if(!/^[a-f0-9]{64}$/i.test(key)||!/^(postgresql|postgres):\/\//.test(url)||(enab
   enabled,
   allowedTesterIds
  });
- Deno.serve((request:Request)=>!enabled?(stagingHealthResponse(request)??server(request)):server(request));
+ // A static GET health must remain available in BOTH disabled and tester-enabled modes.
+ // It never bypasses signature validation for POST interactions.
+ Deno.serve((request:Request)=>stagingHealthResponse(request,{commandsEnabled:enabled})??server(request));
 }
