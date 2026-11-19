@@ -32,3 +32,23 @@ test("all gates are explicit, no assumed approval",()=>{
  assert.equal(x.readyForControlledTest,true);
  assert.equal(x.warnings.some(t=>t.includes("active")),false);
 });
+
+test("preflight rejects downgrade, unknown and ambiguous PostgreSQL SSL modes",()=>{
+ const base="postgresql://staging_role:placeholder@pooler.example.internal:5432/matchmaker";
+ for(const suffix of [
+  "?sslmode=disable","?sslmode=allow","?sslmode=prefer",
+  "?sslmode=unknown","?sslmode=require&sslmode=disable",
+  "?sslmode=require&SslMode=disable","?sslmode=require&sslmode=require"
+ ]){
+  const report=auditMatchmakerConfig({...valid,databaseUrl:base+suffix});
+  assert.equal(report.ok,false,"must reject "+suffix);
+  assert.ok(report.errors.some(message=>message.includes("TLS mode")));
+ }
+ for(const mode of ["require","verify-ca","verify-full"]){
+  const report=auditMatchmakerConfig({...valid,databaseUrl:base+"?sslmode="+mode});
+  assert.equal(report.ok,true,"secure mode should remain valid: "+mode);
+ }
+ const missing=auditMatchmakerConfig({...valid,databaseUrl:base});
+ assert.ok(missing.warnings.some(message=>message.includes("omits sslmode")));
+ assert.equal(missing.readyForControlledTest,false,"warnings are not launch approval");
+});
