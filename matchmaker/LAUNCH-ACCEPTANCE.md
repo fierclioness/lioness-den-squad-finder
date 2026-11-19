@@ -1,6 +1,8 @@
 # Den Matchmaker — launch acceptance and rollback checklist
 **Review-only checklist · November 19, 2026. Not launch authorization.**
 
+**Current staging evidence (Nov 19):** Ed25519 gateway v16 ACTIVE only in isolated staging; 1.5-second total body-read timeout with HTTP 408 fail-closed and zero replay claims on stalled body (Node regression). Latest 136/136 Node tests [PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44509638205), [Edge TypeScript and hosted negative HTTP PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44509638191), and [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44509638270). Authenticated Discord signed PING was previously verified, but **real `/squad` end-to-end ACK timing, worker/publishing/cleanup and release remain UNVERIFIED**; do not infer approval from green CI.
+
 ## Scope and non-negotiable separation
 - **Isolated staging only:** Supabase project `tcxktyqywsqafnyxhpgy`; independent Discord *Den Matchmaker Test* app.
 - **Production is out of scope:** do not change Den Missions project `cpjcjcxinhjusosaguyi`, the live Discord application/bot, member records, or the original manual Squad Finder without separate explicit approval.
