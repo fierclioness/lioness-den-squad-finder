@@ -74,3 +74,15 @@ test("cancelled preview never confirms and wrong guild cannot dispatch",async()=
  const wrong=await (await handle(request({...cmd(member,"list"),guild_id:"999999999999999999"}))).json();
  assert.match(wrong.data.content,/only/i);
 });
+
+test("concurrent identical signed interaction is dispatched exactly once",async()=>{
+ const handle=system();
+ const request1=request(cmd(member,"list"));
+ // Cloning preserves the exact signature, timestamp, body and replay ID.
+ const request2=request1.clone();
+ const responses=await Promise.all([handle(request1),handle(request2)]);
+ assert.deepEqual(responses.map(r=>r.status).sort((a,b)=>a-b),[200,401]);
+ const bodies=await Promise.all(responses.map(r=>r.json()));
+ assert.equal(bodies.filter(x=>x?.data?.flags===64).length,1);
+ assert.equal(bodies.filter(x=>x?.error==="Unauthorized").length,1);
+});
