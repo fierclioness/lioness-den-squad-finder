@@ -18,6 +18,15 @@ export function auditMatchmakerConfig(config) {
     try{url=new URL(config.databaseUrl);}catch{errors.push("Database URL is malformed");}
     if(url){
       if(url.username===""||url.password==="")errors.push("Database credentials are missing");
+      // pg-connection-string query parameters can shadow URL authority values,
+      // e.g. ?host=other-project overrides the reviewed hostname. Never clear
+      // a staging preflight with such a hidden connection-target override.
+      const params=[...url.searchParams];
+      const shadow=new Set(["host","hostaddr","user","username","password","port","database","dbname","db"]);
+      if(params.some(([name])=>shadow.has(name.toLowerCase())))
+        errors.push("Database URL query parameters can override the reviewed connection identity");
+      if(params.some(([name])=>["ssl","uselibpqcompat"].includes(name.toLowerCase())))
+        errors.push("Database TLS override parameters are not permitted");
       // node-postgres interprets sslmode as a connection security hint.
       // Never approve downgrade modes, unknown modes, or duplicate/ambiguous
       // parameters where the client and reviewer could select different values.
