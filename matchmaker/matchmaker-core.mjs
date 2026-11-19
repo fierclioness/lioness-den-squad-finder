@@ -66,7 +66,7 @@ export function formatPreview(listing,{publishingEnabled=false}={}) {
     "🕒 Availability: " + d.availability + " (" + d.timezone + ")",
     "",
     publishingEnabled
-      ? "Only after you confirm, the bot may post this request in #squad-up. No automatic DMs. 💕"
-      : "After you save, only /squad list shows these preferences. No #squad-up post or automatic DMs. 💕"
+      ? "Only after you confirm, the bot may post this request in #squad-up. No pressure, no automatic DMs. 💕"
+      : "After you save, only /squad list shows these preferences. No pressure. No #squad-up post or automatic DMs. 💕"
   ].join("\n");
 }
