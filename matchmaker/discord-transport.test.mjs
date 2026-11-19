@@ -38,3 +38,17 @@ test("ambiguous API failure is an error, never marked confirmed",async()=>{
   fetchFn:async()=>{throw Error("Network timeout")}});
  await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/timeout/);
 });
+
+test("posting transport exposes bounded abort signal and treats timeout as unconfirmed",async()=>{
+ const t=makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:20,
+  fetchFn:async(_url,options)=>{
+    assert.equal(options.signal instanceof AbortSignal,true);
+    return new Promise((_resolve,reject)=>{
+      if(options.signal.aborted)return reject(options.signal.reason);
+      options.signal.addEventListener("abort",()=>reject(options.signal.reason),{once:true});
+    });
+  }});
+ await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),e=>e?.name==="TimeoutError");
+ assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:0}),/timeout/);
+ assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:16000}),/timeout/);
+});
