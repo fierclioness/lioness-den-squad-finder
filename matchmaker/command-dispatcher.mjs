@@ -39,8 +39,12 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
    return {content:"Use /squad create, mine, list, or close."};
   }
   if(input.type===3&&typeof data?.custom_id==="string"){
-   const match=/^mm:(confirm|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(data.custom_id);
-   if(!match)return {content:"Button no longer available."};
+   const match=/^mm:(confirm|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(private|public)$/i.exec(data.custom_id);
+   if(!match)return {content:"Button no longer available. Create a fresh squad request."};
+   // Consent is bound to the preview button mode. A deployment flag change
+   // must never reinterpret a private preview as authorization to publish.
+   if(match[3] !== (publishingEnabled?"public":"private"))
+    return {content:"Posting settings changed since this preview. Create a fresh squad request to review the current options."};
    if(match[1]==="cancel"){
     await store.cancel(actor,match[2]);return {content:"Preview cancelled. Nothing was posted."};
    }
