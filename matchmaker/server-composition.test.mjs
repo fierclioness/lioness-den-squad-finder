@@ -44,4 +44,6 @@ test("server fails closed when private DB connection fails",async()=>{
 test("invalid configuration cannot enable or weaken server",()=>{
  assert.throws(()=>makeMatchmakerServer({publicKeyHex}),/database query/);
  assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),enabled:"true"}),/boolean/);
+ assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),publishingEnabled:true}),/Publishing requires/);
+ assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),enabled:true,publishingEnabled:"true"}),/Publishing requires/);
 });
