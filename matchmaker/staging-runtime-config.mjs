@@ -17,7 +17,16 @@ function pointsAtWrongSupabaseProject(databaseUrl){
   if(host.includes(DEN_MISSIONS_PRODUCTION_REF) ||
      username.includes(DEN_MISSIONS_PRODUCTION_REF))return true;
   const directRef=/^db\.([a-z0-9]{20})\.supabase\.co$/.exec(host)?.[1];
-  const poolerRef=/^postgres\.([a-z0-9]{20})$/.exec(username)?.[1];
+  // Supabase poolers are shared: the project ref must be present in the
+  // database role (postgres.<ref> or a custom role.<ref>).
+  const poolerRef=/^[a-z0-9_]+\.([a-z0-9]{20})$/.exec(username)?.[1];
+  const canonicalPooler=/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(host);
+  // A URL that only resembles an official Supabase hostname (for example,
+  // db.<ref>.supabase.co.evil.invalid) must never receive DB credentials.
+  // Dedicated private proxy hosts remain possible but need separate review.
+  const supabaseLikeHost=/(?:^|\.)supabase\.(?:co|com)(?:\.|$)/.test(host);
+  if(supabaseLikeHost&&!directRef&&!canonicalPooler)return true;
+  if(canonicalPooler&&!poolerRef)return true;
   return Boolean((directRef&&directRef!==STAGING_REF) ||
     (poolerRef&&poolerRef!==STAGING_REF));
  }catch{return true;}
