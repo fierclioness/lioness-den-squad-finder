@@ -31,11 +31,13 @@ try {
  const guild_id="1546529497925296199";
  const member={user:{id:"1418199180287148081"}};
  const stranger={user:{id:"1418199180287148082"}};
+ // Two explicit test actors preserve the cross-owner token isolation test.
+ const allowedTesterIds=new Set([member.user.id,stranger.user.id]);
  const values={game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Friday evening"};
  const cmd=(who,name,options=[])=>({type:2,guild_id,member:who,data:{name:"squad",options:[{name,options}]}});
  const click=(who,custom_id)=>({type:3,guild_id,member:who,data:{custom_id}});
  const handle=makeMatchmakerHttpHandler({
-  publicKeyHex,clock:()=>now,enabled:true,
+  publicKeyHex,clock:()=>now,enabled:true,allowedTesterIds,
   claimReplay:store.claimReplay,
   dispatch:makeMatchmakerDispatcher({store})
  });
@@ -64,7 +66,7 @@ try {
  assert.match((await (await handle(signed(click(stranger,tokenConfirm)))).json()).data.content,/could not complete/i);
  // Fail closed if DB is unavailable and a signed request can't claim its interaction ID.
  const broken=makeMatchmakerHttpHandler({
-  publicKeyHex,clock:()=>now,enabled:true,
+  publicKeyHex,clock:()=>now,enabled:true,allowedTesterIds,
   claimReplay:async()=>{throw Error("DB unavailable");},
   dispatch:makeMatchmakerDispatcher({store})
  });
