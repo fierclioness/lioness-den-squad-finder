@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | Isolated schema and replay | Private RLS schema; deny ordinary roles; authentic signed PING plus one durable replay claim; concurrent same-ID replay denied | **Offline + staging PING verified**; recheck before launch |
 | Real command | Test app installed/command accessible to **approved test user only**; `/squad create`, confirm, mine, list, close and cancel tested end-to-end with posting disabled | **Blocked on separate guild/test-app authorization and real client run** |
-| Response deadline | Record client-observed end-to-end receipt/ACK for actual signed command, not merely Edge execution or PING. Every sampled ACK must arrive within Discord's **3-second deadline**; aim for p95 under 2 seconds with network headroom. Document sample count, cold starts and failures | **Unverified** |
+| Response deadline | Record client-observed end-to-end receipt/ACK for actual signed command, not merely Edge execution or PING. Every sampled ACK must arrive within Discord's **3-second deadline**; aim for p95 under 2 seconds with network headroom. Document sample count, cold starts and failures. If the local telemetry clock is unavailable, the handler must still acknowledge and the missing sample must NOT be counted as a pass | **Unverified** |
 | Negative authorization | Signed non-tester, cross-guild, malformed command and reused interaction ID must not mutate listings; forged/unsigned payload HTTP 401. Do not use live non-consenting members as actors | **Offline verified; real signed test pending** |
 | Private-list consent | With posting OFF, confirm persists only opt-in in-command discovery; later feature toggle cannot publish historical private listings | **Offline/DB reviewed; real client pending** |
 | Outbox uncertainty | A timed-out or unconfirmed POST must be quarantined, never automatically retried. A confirmed delivery but failed DB receipt must require manual reconciliation | **Offline covered; controlled REST test pending** |
@@ -42,6 +42,7 @@
 - **Hosted Edge 200 health** proves routing/configuration, **not** Discord client command function or a 3-second ACK.
 - **Signed PING** proves a signature and replay DB path, **not** command dispatcher authorization or a user-visible `/squad` result.
 - **Mocked Discord POST/GET/DELETE** proves code paths, **not** that a real bot has permissions or that public messages were safely cleaned up.
+- **Timing instrumentation** is diagnostic, not a request gate. Clock exceptions, non-finite or backwards timestamps must not affect the signed interaction ACK or hide its original failure; record unavailable samples as missing, never as successful 0-ms ACKs. Reject invalid local budget thresholds (must be positive and strictly below 3 seconds).
 - Synthetic SQL tests must run in explicit `BEGIN`/`ROLLBACK` and be followed by table-row counts. Never label them as real member data tests.
 
 **Current decision:** Continue branch-only safety and offline/staging-negative tests. **Not launch-ready; no production or Discord-live authorization granted.**
