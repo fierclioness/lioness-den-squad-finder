@@ -48,3 +48,9 @@
 - Synthetic SQL tests must run in explicit `BEGIN`/`ROLLBACK` and be followed by table-row counts. Never label them as real member data tests.
 
 **Current decision:** Continue branch-only safety and offline/staging-negative tests. **Not launch-ready; no production or Discord-live authorization granted.**
+
+## Additional launch security evidence — Discord REST redirects (Nov 19, 2026)
+
+- DRAFT only: fixed bot-authorized Discord POST, GET and DELETE use `redirect:"error"` and reject even plausible successful receipts when `response.redirected===true`. This ensures a redirect cannot count as a confirmed publish or bot-owned cleanup.
+- Two added tests: rejected redirected publishing receipt; redirected GET never leads to DELETE; redirected DELETE is ambiguous and never retried. [161/161 Node PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44598793861), [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44598793809), [Postgres PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44598793802) on `aa81a1fb`.
+- Offline fixtures are not a real Discord POST/GET/DELETE or client latency test. No guild installation, public posting, private/member data edit, live Discord settings, worker scheduling, staging deploy or production changes were performed. PR draft; Edge staging v17 unchanged. All launch authorization gates stay OPEN.
