@@ -1,3 +1,4 @@
+import {PLATFORMS,VIBES,MIC,ZONES} from "./matchmaker-core.mjs";
 // Guild-scoped Discord application command definition (NOT registered).
 // All commands default to ephemeral responses from a separately verified endpoint.
 const choose = values => values.map(value => ({name:value,value}));
@@ -29,6 +30,12 @@ export function validateManifest(){
  const create=squadCommand.options[0];
  if(create.options.length!==6 || create.options.some(x=>!x.required))
   throw new Error("Incomplete create form");
+ const expected=[PLATFORMS,VIBES,MIC,ZONES];
+ for(let i=0;i<expected.length;i++){
+  const choices=create.options[i+1].choices?.map(x=>x.value);
+  if(JSON.stringify(choices)!==JSON.stringify(expected[i]))throw Error("Discord choices drifted from draft validation");
+ }
+ if(create.options[0].max_length!==55||create.options[5].max_length!==70)throw Error("Discord text limits drifted");
  if(create.options.some(x=>x.choices?.length>25))
   throw new Error("Discord choice cap exceeded");
  return true;
