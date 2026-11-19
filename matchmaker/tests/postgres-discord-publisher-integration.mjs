@@ -90,9 +90,16 @@ try {
   enabled:true,query,verifiedCleanup,channelId,botUserId,
   newWorkerId:()=>"33333333-3333-4333-8333-333333333333"
  });
- assert.deepEqual(await cleanupWorker.runOnce(),{status:"deleted",listingId:listing.listingId});
- assert.deepEqual(deleteMethods,["GET","DELETE"]);
- assert.equal((await cleanupWorker.runOnce()).status,"empty");
+ // Earlier SQL fixture tests in this SAME disposable CI database may leave
+ // other pending cleanup jobs. The worker must safely quarantine those
+ // untrusted jobs before reaching the listing created by this test.
+ let cleaned=null;
+ for(let i=0;i<25;i++){
+  const step=await cleanupWorker.runOnce();
+  if(step.listingId===listing.listingId){cleaned=step;break;}
+  assert.ok(["quarantined","uncertain"].includes(step.status),"Unexpected unrelated fixture cleanup result: "+step.status);
+ }
+ assert.deepEqual(cleaned,{status:"deleted",listingId:listing.listingId});
  assert.deepEqual(deleteMethods,["GET","DELETE"]);
  const cleanRecord=(await query(
   "select state,attempts from matchmaker_internal.cleanup_outbox where listing_id=$1",
