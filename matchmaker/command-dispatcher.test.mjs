@@ -40,3 +40,20 @@ test("reject bad guild, missing methods and unsafe draft",async()=>{
  await assert.rejects(dispatch(command({...actor,guildId:"999999999999999999"},"list")) ,/Invalid signed actor/);
  await assert.rejects(dispatch(command(actor,"create",[{name:"game",value:"@everyone"}])),/Invalid text|Mentions|Invalid selection/);
 });
+
+test("publication preview requires explicit consent and matching store flag",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ const store={
+  prepare:async()=>({token}),confirm:async()=>({publicPostCreated:false,queuedForPublishing:true}),
+  cancel:async()=>true,mine:async()=>null,list:async()=>[],close:async()=>false
+ };
+ assert.throws(()=>makeMatchmakerDispatcher({store,publishingEnabled:"true"}),/flag/);
+ const privateDispatch=makeMatchmakerDispatcher({store});
+ await assert.rejects(privateDispatch(click(actor,"mm:confirm:"+token)),/consent/);
+ const publicDispatch=makeMatchmakerDispatcher({store,publishingEnabled:true});
+ const opts=Object.entries(draft).map(([name,value])=>({name,value}));
+ const preview=await publicDispatch(command(actor,"create",opts));
+ assert.match(preview.content,/PUBLIC posting/);
+ assert.equal(preview.buttons[0].label,"Post to #squad-up");
+ assert.match((await publicDispatch(click(actor,"mm:confirm:"+token))).content,/queued for posting/);
+});
