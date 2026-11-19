@@ -18,12 +18,11 @@ async function readLimitedBody(request,timeoutMs){
  // A small body can still stall forever between chunks. Set ONE deadline for
  // the entire pre-authentication read, not a fresh deadline per chunk.
  // This is safe to time out: no signature verification or DB write has begun.
- const deadline=AbortSignal.timeout(timeoutMs);
- let detachTimeout;
+ // A referenced timer also works with a fully idle/never-resolving stream in
+ // Node tests; clear it immediately after the body has finished reading.
+ let timer;
  const timeout=new Promise((_,reject)=>{
-  const listener=()=>reject(new BodyReadTimeout("Discord payload read deadline exceeded"));
-  deadline.addEventListener("abort",listener,{once:true});
-  detachTimeout=()=>deadline.removeEventListener("abort",listener);
+  timer=setTimeout(()=>reject(new BodyReadTimeout("Discord payload read deadline exceeded")),timeoutMs);
  });
  let total=0;
  const parts=[];
@@ -40,7 +39,7 @@ async function readLimitedBody(request,timeoutMs){
   // Cancel excess streaming input; never reach signing or replay storage.
   void reader.cancel().catch(()=>{});
   throw error;
- }finally{detachTimeout();reader.releaseLock();}
+ }finally{clearTimeout(timer);reader.releaseLock();}
  const bytes=new Uint8Array(total);
  let offset=0;
  for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}
