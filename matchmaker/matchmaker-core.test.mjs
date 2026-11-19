@@ -31,3 +31,14 @@ test("reject malformed and dangerous values",()=>{
  assert.throws(()=>validateDraft({...draft,game:"a".repeat(56)}),/too long/);
  assert.throws(()=>validateDraft({...draft,availability:"  "}),/missing/);
 });
+
+test("consent-aware preview never suggests public chat for private-only drafts",()=>{
+ const privateText=formatPreview(draft);
+ assert.match(privateText,/only \/squad list shows these preferences/);
+ assert.match(privateText,/No #squad-up post/);
+ assert.doesNotMatch(privateText,/Reply in #squad-up/);
+ const publicText=formatPreview(draft,{publishingEnabled:true});
+ assert.match(publicText,/Only after you confirm/);
+ assert.match(publicText,/may post this request in #squad-up/);
+ assert.throws(()=>formatPreview(draft,{publishingEnabled:"true"}),/Invalid preview publishing mode/);
+});
