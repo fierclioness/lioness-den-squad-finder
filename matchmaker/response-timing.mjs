@@ -9,8 +9,22 @@ export function makeResponseTimingProbe({handler,clock=()=>performance.now(),bud
  if(!Number.isFinite(budgetMs)||budgetMs<=0||budgetMs>=DISCORD_DEADLINE_MS)
    throw Error("Local budget must be below Discord's deadline");
  return async request=>{
-   // Telemetry must never delay, replace, or cause a second attempt at a
-   // signed interaction. A failing observer is not a Discord request failure.
+   // Diagnostic clocks are untrusted too. A failed or non-monotonic clock
+   // must never prevent a signed Discord ACK or mask a handler exception.
+   const readClock=()=>{
+     try{
+       const value=clock();
+       return Number.isFinite(value)?value:null;
+     }catch{return null;}
+   };
+   const start=readClock();
+   const elapsed=()=>{
+     if(start===null)return null;
+     const end=readClock();
+     if(end===null||end<start)return null;
+     return end-start;
+   };
+   // Telemetry must never delay, replace, or trigger retry of an interaction.
    const report=result=>{
      try{
        const pending=onResult(result);
@@ -18,18 +32,18 @@ export function makeResponseTimingProbe({handler,clock=()=>performance.now(),bud
          void Promise.resolve(pending).catch(()=>{});
      }catch{/* best-effort diagnostics only */}
    };
-   const start=clock();
    let response;
    try{
      response=await handler(request);
    }catch(error){
-     report({elapsedMs:clock()-start,withinLocalBudget:false,
+     const elapsedMs=elapsed();
+     if(elapsedMs!==null)report({elapsedMs,withinLocalBudget:false,
        withinDiscordDeadline:false,httpStatus:null});
      throw error;
    }
-   const elapsedMs=clock()-start;
-   report({elapsedMs,withinLocalBudget:elapsedMs>=0 && elapsedMs<budgetMs,
-     withinDiscordDeadline:elapsedMs>=0 && elapsedMs<DISCORD_DEADLINE_MS,
+   const elapsedMs=elapsed();
+   if(elapsedMs!==null)report({elapsedMs,withinLocalBudget:elapsedMs<budgetMs,
+     withinDiscordDeadline:elapsedMs<DISCORD_DEADLINE_MS,
      httpStatus:response?.status??null});
    return response;
  };
