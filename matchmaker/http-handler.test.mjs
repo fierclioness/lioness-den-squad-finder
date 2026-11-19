@@ -141,3 +141,40 @@ test("restricted staging test allowlist rejects other members before dispatch",a
  assert.equal(calls,1);
  assert.throws(()=>fixture({allowedTesterIds:new Set(["bad"])}),/allowlist/);
 });
+
+
+test("stalled signed request bodies are cancelled before signature, replay, or dispatch",async()=>{
+ let claims=0,dispatches=0,cancelled=false;
+ const handle=fixture({enabled:true,bodyReadTimeoutMs:50,
+  claimReplay:async()=>{claims++;return true;},
+  dispatch:async()=>{dispatches++;return {content:"should not run"};}
+ });
+ // Deliver the first bytes, then leave the stream indefinitely open.
+ // The request is rejected at the pre-authentication read boundary.
+ const stream=new ReadableStream({
+  start(controller){controller.enqueue(new TextEncoder().encode('{"id":"1546529501859815438"'));},
+  cancel(){cancelled=true;}
+ });
+ const req=new Request("https://example.invalid/functions/v1/den-matchmaker",{
+  method:"POST",duplex:"half",
+  headers:{"x-signature-ed25519":"00".repeat(64),"x-signature-timestamp":ts},
+  body:stream
+ });
+ const started=performance.now();
+ const res=await handle(req);
+ assert.equal(res.status,408);
+ assert.deepEqual(await res.json(),{error:"Request timeout"});
+ assert.ok(performance.now()-started<1000,"Must bound a stalled body, not wait for peer completion");
+ assert.equal(claims,0);
+ assert.equal(dispatches,0);
+ assert.equal(cancelled,true);
+});
+test("body deadline configuration is bounded and normal signed PING still succeeds",async()=>{
+ for(const invalid of [0,24,2001,Infinity,"1500",null]){
+  assert.throws(()=>fixture({bodyReadTimeoutMs:invalid}),/body read timeout/);
+ }
+ const handle=fixture({bodyReadTimeoutMs:500});
+ const res=await handle(signed({type:1}));
+ assert.equal(res.status,200);
+ assert.deepEqual(await res.json(),{type:1});
+});
