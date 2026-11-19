@@ -35,3 +35,12 @@ test("missing claimant, unavailable claimant and malformed JSON fail closed",asy
  const sig=sign(null,Buffer.concat([Buffer.from(timestamp),Buffer.from(noJson)]),privateKey).toString("hex");
  await assert.rejects(v.authenticate({rawBody:noJson,timestamp,signature:sig}),/Invalid JSON/);
 });
+
+test("signature freshness cannot be weakened by unsafe configuration",()=>{
+ const basic={publicKeyHex:hex,claimReplay:async()=>true,clock:()=>now};
+ for(const maxAgeMs of [-1,0,999,300001,Infinity,NaN,1.5]){
+  assert.throws(()=>makeDiscordVerifier({...basic,maxAgeMs}),/bounded to five minutes/);
+ }
+ assert.throws(()=>makeDiscordVerifier({...basic,clock:null}),/bounded to five minutes/);
+ assert.doesNotThrow(()=>makeDiscordVerifier({...basic,maxAgeMs:300000}));
+});
