@@ -12,6 +12,17 @@ function pointsAtWrongSupabaseProject(databaseUrl){
  // be attributed by URL alone and still need independent credential review.
  try{
   const parsed=new URL(databaseUrl);
+  // node-postgres/pg-connection-string accepts query-string connection
+  // parameters that can OVERRIDE the URL host, user and other identities.
+  // Check the effective URL unambiguously before handing it to pg.Pool.
+  const params=[...parsed.searchParams];
+  const overrides=new Set(["host","hostaddr","user","username","password","port","database","dbname","db"]);
+  if(params.some(([name])=>overrides.has(name.toLowerCase())))return true;
+  // A query-string TLS override can also supersede the audited pool SSL
+  // settings. Allow only known secure sslmode values, with no duplicates.
+  const sslModes=params.filter(([name])=>name.toLowerCase()==="sslmode").map(([,value])=>value);
+  if(sslModes.length>1 || sslModes.some(mode=>!["require","verify-ca","verify-full"].includes(mode)))return true;
+  if(params.some(([name])=>["ssl","uselibpqcompat"].includes(name.toLowerCase())))return true;
   const host=parsed.hostname.toLowerCase();
   const username=decodeURIComponent(parsed.username).toLowerCase();
   if(host.includes(DEN_MISSIONS_PRODUCTION_REF) ||
