@@ -120,3 +120,34 @@ test("cross-project explicit override must not silently use otherwise valid buil
   })),"","Cross-project explicit override must deny, never fall back");
  }
 });
+
+test("Supabase-looking DNS suffixes must never receive staging database credentials",()=>{
+ const impostors=[
+  "postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co.evil.invalid/postgres",
+  "postgresql://postgres:placeholder@db.abcdefghijklmnopqrst.supabase.co.evil.invalid/postgres",
+  "postgresql://postgres.tcxktyqywsqafnyxhpgy:placeholder@aws-0-us-east-1.pooler.supabase.com.evil.invalid/postgres",
+  "postgresql://postgres.tcxktyqywsqafnyxhpgy:placeholder@not-the-pooler.supabase.com/postgres"
+ ];
+ for(const url of impostors){
+  for(const key of ["DEN_MATCHMAKER_DATABASE_URL","SUPABASE_DB_URL"]){
+   assert.equal(resolvePrivateDatabaseUrl(read({
+    SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+    [key]:url
+   })),"",key+" must reject disguised Supabase host "+url.split("@").at(-1));
+  }
+ }
+});
+test("Supabase shared pooler requires a project-scoped role for staging",()=>{
+ const hostname="aws-0-us-east-1.pooler.supabase.com:6543";
+ for(const username of ["postgres","custom_role","postgres.short","postgres.abcdefghijklmnopqrst"]){
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   DEN_MATCHMAKER_DATABASE_URL:"postgresql://"+username+":placeholder@"+hostname+"/postgres"
+  })),"","Shared pooler must identify the correct project");
+ }
+ const custom="postgresql://custom_role.tcxktyqywsqafnyxhpgy:placeholder@"+hostname+"/postgres";
+ assert.equal(resolvePrivateDatabaseUrl(read({
+  SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+  DEN_MATCHMAKER_DATABASE_URL:custom
+ })),custom);
+});
