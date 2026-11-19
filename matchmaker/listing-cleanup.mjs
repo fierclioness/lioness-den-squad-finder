@@ -15,22 +15,23 @@ export function planCleanup(record,{now=Date.now()}={}){
   return {action:"manual",reason:"Ownership, channel or receipt not verified"};
  return {action:"delete",messageId:String(record.messageId),channelId:String(record.channelId)};
 }
-export function makeMessageCleanupTransport({botToken,channelId,fetchFn=fetch,enabled=false}){
+// The legacy cleanup transport must NEVER delete on DB-record trust alone.
+// Re-check the exact Discord message's author and channel before every DELETE.
+// This enforces the same bot-owned message gate as the reviewed cleanup path.
+import {makeVerifiedBotCleanup} from "./verified-bot-cleanup.mjs";
+export function makeMessageCleanupTransport({botToken,botUserId,channelId,fetchFn=fetch,enabled=false}){
  if(typeof enabled!=="boolean"||typeof fetchFn!=="function")throw Error("Invalid transport setup");
- if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))))
-  throw Error("Trusted bot token and channel required");
+ if(enabled && (typeof botToken!=="string"||botToken.length<20||
+    !SNOW.test(String(botUserId||""))||!SNOW.test(String(channelId||""))))
+   throw Error("Trusted bot token, bot identity and channel required");
+ const verified=makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn,enabled});
  return Object.freeze({
    async removeConfirmedBotPost(plan){
      if(!enabled)throw Error("Cleanup disabled");
-     if(plan?.action!=="delete"||plan.channelId!==channelId||!SNOW.test(String(plan.messageId||"")))
+     if(plan?.action!=="delete"||plan.channelId!==channelId||
+        !SNOW.test(String(plan.messageId||"")))
        throw Error("Unverified message deletion request");
-     const url="https://discord.com/api/v10/channels/"+channelId+"/messages/"+plan.messageId;
-     const response=await fetchFn(url,{method:"DELETE",headers:{authorization:"Bot "+botToken}});
-     if(response?.status===204)return {status:"deleted"};
-     // 404 means the post is absent; a verified own-message ID is required above.
-     if(response?.status===404)return {status:"already_absent"};
-     // 429, 403, timeouts and 5xx require controlled retry/reconciliation.
-     throw Error("Delete not confirmed; manual reconciliation required");
+     return verified.remove(String(plan.messageId));
    }
  });
 }
