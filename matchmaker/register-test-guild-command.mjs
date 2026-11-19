@@ -13,10 +13,11 @@ export function makeRegistrationRequest({token,applicationId=APP,guildId=GUILD}=
 export async function registerTestGuildCommand({token,fetchFn=fetch,applicationId=APP,guildId=GUILD}={}){
  if(typeof fetchFn!=="function")throw Error("Fetch implementation required");
  const {url,options}=makeRegistrationRequest({token,applicationId,guildId});
- const res=await fetchFn(url,options);
+ const res=await fetchFn(url,{...options,signal:AbortSignal.timeout(5000)});
  if(!res.ok)throw Error("Discord test command registration failed (HTTP "+res.status+")");
- const body=await res.json();
- if(body?.name!=="squad"||body?.application_id!==APP||body?.guild_id!==GUILD)
+ let body;
+ try{body=await res.json();}catch{throw Error("Discord returned an invalid registration receipt");}
+ if(body?.name!=="squad"||body?.application_id!==APP||body?.guild_id!==GUILD||!/^\d{15,22}$/.test(String(body?.id||"")))
   throw Error("Discord returned an unexpected command receipt");
  return {registered:true,name:body.name,guildId:GUILD};
 }
