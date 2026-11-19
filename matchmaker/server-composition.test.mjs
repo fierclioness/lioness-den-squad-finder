@@ -37,11 +37,12 @@ test("server starts disabled and cannot change any listing",async()=>{
   assert.ok(calls.every(x=>x.sql.includes("claim_interaction")));
 });
 test("server fails closed when private DB connection fails",async()=>{
- const server=makeMatchmakerServer({publicKeyHex,query:async()=>{throw Error("private DB unavailable");},enabled:true,clock:()=>now});
+ const server=makeMatchmakerServer({publicKeyHex,query:async()=>{throw Error("private DB unavailable");},enabled:true,allowedTesterIds:new Set([member.user.id]),clock:()=>now});
  const ping=await server(signed({type:1}));
  assert.equal(ping.status,401);
 });
 test("invalid configuration cannot enable or weaken server",()=>{
+ assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),enabled:true}),/nonempty tester allowlist/);
  assert.throws(()=>makeMatchmakerServer({publicKeyHex}),/database query/);
  assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),enabled:"true"}),/boolean/);
  assert.throws(()=>makeMatchmakerServer({publicKeyHex,query:async()=>({rows:[]}),publishingEnabled:true}),/Publishing requires/);
