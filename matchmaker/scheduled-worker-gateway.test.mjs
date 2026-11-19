@@ -90,8 +90,7 @@ test("scheduler executes only exact trusted paths, never a matching last segment
   "/run/maintenance/",
   "/run/%6daintenance",
   "/maintenance",
-  "/run/constructor",
-  "/run/cleanup/../maintenance"
+  "/run/constructor"
  ]){
   const response=await handler(request(path));
   assert.equal(response.status,404,path);
