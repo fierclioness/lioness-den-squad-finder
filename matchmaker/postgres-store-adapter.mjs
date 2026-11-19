@@ -21,8 +21,9 @@ function firstRow(result){
  if(!result || !Array.isArray(result.rows))throw Error("Invalid database result");
  return result.rows[0] || null;
 }
-export function makePostgresMatchmakerStore({query}){
+export function makePostgresMatchmakerStore({query,publishingEnabled=false}){
  if(typeof query!=="function")throw Error("Trusted PostgreSQL query function required");
+ if(typeof publishingEnabled!=="boolean")throw Error("Publishing feature flag must be a boolean");
  async function one(sql,params){
    return firstRow(await query(sql,params));
  }
@@ -36,10 +37,14 @@ export function makePostgresMatchmakerStore({query}){
  }
  async function confirm(actor,previewToken){
   const id=owner(actor),t=token(previewToken);
-  const row=await one("select matchmaker_internal.confirm_and_enqueue($1,$2::uuid) as id",[id,t]);
-  if(row?.id==null)throw Error("Confirmation did not atomically queue a listing");
-  // Public posting remains DISABLED until a separately authorized worker is enabled.
-  return {listingId:String(row.id),publicPostCreated:false};
+  // A private confirmation must never enqueue a future public message:
+  // enabling a worker later cannot retroactively publish private requests.
+  const sql=publishingEnabled
+    ? "select matchmaker_internal.confirm_and_enqueue($1,$2::uuid) as id"
+    : "select matchmaker_internal.confirm_preview($1,$2::uuid) as id";
+  const row=await one(sql,[id,t]);
+  if(row?.id==null)throw Error("Confirmation could not be saved");
+  return {listingId:String(row.id),publicPostCreated:false,queuedForPublishing:publishingEnabled};
  }
  async function cancel(actor,previewToken){
   const row=await one("select matchmaker_internal.cancel_preview($1,$2::uuid) as cancelled",
