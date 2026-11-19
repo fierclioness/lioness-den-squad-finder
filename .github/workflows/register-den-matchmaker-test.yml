@@ -1,0 +1,32 @@
+name: Register Den Matchmaker Test slash command
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_test_only:
+        description: 'Type REGISTER_TEST_ONLY to register /squad in the approved test guild'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  register-test-command:
+    if: ${{ inputs.confirm_test_only == 'REGISTER_TEST_ONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/den-matchmaker-mvp-2026-11-18
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Register /squad for test app and test guild ONLY
+        env:
+          DEN_MATCHMAKER_TEST_BOT_TOKEN: ${{ secrets.DEN_MATCHMAKER_TEST_BOT_TOKEN }}
+        run: |
+          if [ -z "$DEN_MATCHMAKER_TEST_BOT_TOKEN" ]; then
+            echo "Missing test bot token in GitHub Actions secrets" >&2
+            exit 1
+          fi
+          node matchmaker/register-test-guild-command.mjs --register
