@@ -40,6 +40,9 @@ test("ambiguous API failure is an error, never marked confirmed",async()=>{
 });
 
 test("posting transport exposes bounded abort signal and treats timeout as unconfirmed",async()=>{
+ // Native fetch keeps the event loop alive; our mock intentionally does not.
+ const hold=setTimeout(()=>{},400);
+ try {
  const t=makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:20,
   fetchFn:async(_url,options)=>{
     assert.equal(options.signal instanceof AbortSignal,true);
@@ -51,4 +54,5 @@ test("posting transport exposes bounded abort signal and treats timeout as uncon
  await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),e=>e?.name==="TimeoutError");
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:0}),/timeout/);
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:16000}),/timeout/);
+ } finally {clearTimeout(hold);}
 });
