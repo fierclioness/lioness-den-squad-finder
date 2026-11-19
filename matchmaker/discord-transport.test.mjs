@@ -24,6 +24,7 @@ test("enabled transport uses fixed channel and forces zero allowed mentions",asy
  assert.deepEqual(payload.allowed_mentions,{parse:[]});
  assert.equal(payload.content,"🎮 Call of Duty — Casual");
  assert.equal(calls[0].init.headers.authorization,"Bot "+token);
+ assert.equal(calls[0].init.redirect,"error","Never follow an authenticated Discord request");
 });
 test("rejects invalid destination, mass mentions and fake receipts",async()=>{
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId:"not-a-snowflake"}),/credentials/);
@@ -55,4 +56,18 @@ test("posting transport exposes bounded abort signal and treats timeout as uncon
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:0}),/timeout/);
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,requestTimeoutMs:16000}),/timeout/);
  } finally {clearTimeout(hold);}
+});
+
+test("redirected Discord REST reply cannot confirm a public post",async()=>{
+ let calls=0;
+ const t=makeDiscordTransport({botToken:token,channelId,botUserId,enabled:true,
+  fetchFn:async(_url,init)=>{
+   calls++;
+   assert.equal(init.redirect,"error");
+   return {ok:true,redirected:true,json:async()=>({
+    id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}
+   })};
+  }});
+ await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/Redirected delivery is untrusted/);
+ assert.equal(calls,1,"No retries after a redirected or ambiguous delivery");
 });
