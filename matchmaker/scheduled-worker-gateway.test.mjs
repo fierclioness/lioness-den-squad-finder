@@ -61,3 +61,18 @@ test("worker exception or untrusted result never leaks details",async()=>{
   postingEnabled:true,publisher:{runOnce:async()=>({status:"custom",member:"sensitive"})}});
  assert.equal((await bad(request("/run/publish"))).status,503);
 });
+
+test("enabled routes reject disabled or wrong-task outcomes instead of false success",async()=>{
+ const bad=[
+  ["publish",{postingEnabled:true,publisher:{runOnce:async()=>({status:"disabled"})}}],
+  ["publish",{postingEnabled:true,publisher:{runOnce:async()=>({status:"deleted"})}}],
+  ["cleanup",{cleanupEnabled:true,cleanup:{runOnce:async()=>({status:"posted"})}}],
+  ["maintenance",{maintenanceEnabled:true,maintenance:{runOnce:async()=>({status:"empty"})}}]
+ ];
+ for(const [task,config] of bad){
+  const handler=makeScheduledWorkerGateway({enabled:true,schedulerSecret:secret,...config});
+  const result=await handler(request("/run/"+task));
+  assert.equal(result.status,503,task);
+  assert.deepEqual(await result.json(),{error:"Worker unavailable"});
+ }
+});
