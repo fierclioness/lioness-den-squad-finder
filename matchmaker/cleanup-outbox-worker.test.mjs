@@ -89,7 +89,7 @@ test("verified post already absent is terminal; failed DB persistence requires m
  assert.deepEqual(await absent.worker.runOnce(),{status:"already_absent",listingId:"8"});
  assert.deepEqual(absent.state().finished,[["8",workerId,true]]);
  const failed=fixture({failFinish:true,remove:async()=>({status:"deleted"})});
- await assert.rejects(failed.worker.runOnce(),/operator reconciliation required/);
+ await assert.rejects(failed.worker.runOnce(),/Cleanup ledger state unconfirmed; manual reconciliation required/);
  assert.deepEqual(failed.state().finished,[["8",workerId,true]]);
 });
 
