@@ -54,7 +54,8 @@ export function closeListing(listing, requesterId, nowMs = Date.now()) {
 export function activeListings(listings, nowMs = Date.now()) {
   return listings.filter(item => item.status === "active" && item.expiresAt > nowMs);
 }
-export function formatPreview(listing) {
+export function formatPreview(listing,{publishingEnabled=false}={}) {
+  if(typeof publishingEnabled!=="boolean")throw Error("Invalid preview publishing mode");
   const d = validateDraft(listing);
   return [
     "👑 THE LIONESS DEN | SQUAD MATCHMAKER",
@@ -64,6 +65,8 @@ export function formatPreview(listing) {
     "🎧 Mic: " + d.mic,
     "🕒 Availability: " + d.availability + " (" + d.timezone + ")",
     "",
-    "Interested? Reply in #squad-up. No pressure, no automatic DMs. 💕"
+    publishingEnabled
+      ? "Only after you confirm, the bot may post this request in #squad-up. No automatic DMs. 💕"
+      : "After you save, only /squad list shows these preferences. No #squad-up post or automatic DMs. 💕"
   ].join("\n");
 }
