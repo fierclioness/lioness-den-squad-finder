@@ -128,3 +128,10 @@ test("non-finite and backwards timestamps do not fabricate latency or fail ACK",
   assert.equal(reports,0);
  }
 });
+
+test("launch latency summary rejects a disabled or unrealistic local budget",()=>{
+ for(const budgetMs of [0,-1,3000,3001,Infinity,Number.NaN]){
+  assert.throws(()=>evaluateTimingSamples([20,40,50],{budgetMs}),/below Discord's deadline/);
+ }
+ assert.equal(evaluateTimingSamples([20,40,50],{budgetMs:100}).withinLocalBudget,true);
+});
