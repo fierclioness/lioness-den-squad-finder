@@ -23,11 +23,20 @@ export function assessUncertainDelivery({listing,outbox,message,channelId,botUse
  // The reference comes from private PostgreSQL, not a member ID or user input.
  if(!verifyReferenceMatch(listing.post_reference,message.content))
   return {decision:"manual_review",reason:"Bot message does not contain this listing's unique persisted reference"};
+ // Never mark a recovered delivery as safe without a trustworthy lifecycle.
+ // In particular, Date.parse(undefined) is NaN and would silently make an
+ // expired-but-unparseable ACTIVE listing appear to need no cleanup.
+ if(!["active","closed","expired"].includes(listing.status))
+  return {decision:"block",reason:"Listing lifecycle state is not verified"};
+ const hasExpiry=typeof listing.expiresAt==="string" || listing.expiresAt instanceof Date;
+ const expiresAt=hasExpiry ? Date.parse(String(listing.expiresAt)) : NaN;
+ if(!Number.isFinite(expiresAt))
+  return {decision:"block",reason:"Listing expiry is not verified"};
  if(operatorApproved!==true)
   return {decision:"approval_required",reason:"A verified receipt still requires explicit reconciliation approval"};
  return {decision:"record_confirmed_receipt",listingId:String(listing.id),
    messageId:String(message.id),channelId,botUserId,
-   cleanupRequired:listing.status!=="active" || Date.parse(listing.expiresAt)<=Date.now()};
+   cleanupRequired:listing.status!=="active" || expiresAt<=Date.now()};
 }
 export function assessNotFoundEvidence({searchComplete=false}={}){
  // Even a thorough history lookup can miss deleted messages or eventual consistency.
