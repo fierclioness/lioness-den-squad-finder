@@ -84,8 +84,8 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
       result.buttons[0].token===result.buttons[1].token) {
      const token=result.buttons[0].token;
      output.data.components=[{type:1,components:[
-       {type:2,style:3,label:result.buttons[0].label==="Post to #squad-up"?"Post to #squad-up":"Save to /squad list",custom_id:"mm:confirm:"+token},
-       {type:2,style:2,label:"Cancel",custom_id:"mm:cancel:"+token}
+       {type:2,style:3,label:result.buttons[0].label==="Post to #squad-up"?"Post to #squad-up":"Save to /squad list",custom_id:"mm:confirm:"+token+":"+(result.buttons[0].label==="Post to #squad-up"?"public":"private")},
+       {type:2,style:2,label:"Cancel",custom_id:"mm:cancel:"+token+":"+(result.buttons[0].label==="Post to #squad-up"?"public":"private")}
      ]}];
    }
    return json(output);
