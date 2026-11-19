@@ -45,6 +45,8 @@ test("end-to-end signed mock interaction: preview, owner confirm, list, close",a
  assert.equal(first.data.flags,64);
  assert.deepEqual(first.data.allowed_mentions,{parse:[]});
  assert.equal(first.data.components[0].components.length,2);
+ assert.equal(first.data.components[0].components[0].label,"Save to /squad list");
+ assert.match(first.data.content,/other Matchmaker users can see/);
  assert.match(first.data.content,/Nothing has been posted/);
  const confirm=first.data.components[0].components[0].custom_id;
  const stolen=await (await handle(request(button(other,confirm)))).json();
