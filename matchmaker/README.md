@@ -1,34 +1,27 @@
-# The Den Matchmaker — Phase 1 (development only)
+# The Den Matchmaker — isolated staging, not live
 
-A private, opt-in squad-listing feature for **The Lioness Den**. This is a *prototype*, not a live Discord bot.
+**Status November 19, 2026:** Implementation is under review in **draft PR #2**. The existing manual Squad Finder at https://fierclioness.github.io/lioness-den-squad-finder/ remains live and unchanged. Neither the production Den Missions bot nor the Lioness Den's member-facing Discord commands have been altered.
 
-## Why
-Existing Squad Finder is a working copy/paste utility and remains untouched. The next experience should let an adult member voluntarily create a temporary squad listing without turning the Discord server into an ad board or DM machine.
+## What is built and verified
 
-## Implemented in this branch
-- `matchmaker-core.mjs`: validates game, platform, play style, microphone preference, time zone and availability.
-- One active listing per owner; listings expire after **36 hours**.
-- Owner-only close; active-list filtering; preview string for the existing #squad-up channel.
-- Guardrails against links and Discord mentions in free-text fields.
-- Pure Node test suite: positive, validation, ownership, expiration and anti-spam cases.
+- Private, opt-in squad listings with one active listing per member, 36-hour expiry, owner-only close, validation against mentions/links and no automatic DMs.
+- Signed Discord HTTP webhook: raw-body Ed25519 check, bounded timestamp, durable Postgres replay claim, verified guild/member context, ephemeral responses and Confirm/Cancel preview buttons.
+- Isolated Supabase staging project with private PostgreSQL schema, service-only functions, one-use previews, rate limiting, atomic posting outbox and immutable bot message receipts. Ordinary anon/authenticated roles cannot access these tables.
+- Development-only Discord POST and bot-authorship-verified GET-before-DELETE cleanup transport, durable workers and conservative quarantine for uncertain deliveries. No blind retries of ambiguous HTTP operations.
+- Node, Deno and disposable PostgreSQL integration tests covering signed requests, private confirmation, posting with **mock** Discord, owner close, races, expiry and cleanup.
+- A **separate Den Matchmaker Test** Discord app successfully verified its staging interaction endpoint using a real signed PING (Edge v7), recording a durable replay. Hosted Edge **v8** has been deployed with commands and public posting still disabled, and its read-only/negative HTTPS smoke checks pass.
 
-## Not implemented
-Discord application /slash command registration, HTTP interactions endpoint, Ed25519 signature verification, persistence, atomic duplicate blocking, rate limits, message posting, database RLS, or member permissions. **Never connect this prototype directly to a public webhook.** These controls must be added and separately tested first.
+## Critical explicit-consent rule
 
-## Next safe milestones
-1. Build a mock-only interaction adapter for `/squad create`, `/squad mine`, `/squad close` and `/squad list` without network access.
-2. Design a private Supabase table with owner-only access, server-enforced 36h TTL, one-active-listing constraint and per-member rate limits. Review schema/RLS before applying anything.
-3. Build a Discord HTTP endpoint that checks raw body Ed25519 signature and request timestamp *before* parsing, rejects replay attempts and supports Discord PING. Verify guild/channel ID and requesting member, restrict mentions.
-4. Show an ephemeral preview and require an explicit **Publish** action before posting only to the existing #squad-up channel; no DMs or user pings. Provide Close / Report options.
-5. Test using authorized secondary account, with real users excluded from experiments; make an opt-in announcement only after owner approves release.
+A member's **Save privately** confirmation calls `confirm_preview` and **does not enqueue a public message**. Enabling a posting worker later cannot retroactively publish that private listing. A distinct reviewed `publishingEnabled:true` command flow is required to call `confirm_and_enqueue`, and the preview must say **Post to #squad-up** before the member confirms. Public sending requires a **separate** bot worker gate, fixed approved channel and operator authorization. All publishing gates are **OFF** in staging.
 
-## Privacy
-Never collect full names, personal age/date of birth, exact addresses or contact info. The 18+ server policy is enforced by existing membership rules; this prototype does not infer age. No scraping message history or measuring private conversations. Store only what is needed to support an opted-in listing.
+## Still required before launch
 
-## References
-- Existing live copy/paste Squad Finder: https://fierclioness.github.io/lioness-den-squad-finder/
-- Discord Interactions guide: https://docs.discord.com/developers/docs/interactions/overview
-- Product request: GitHub issue #1
+1. The owner must explicitly authorize installing the separate test app and guild-scoped `/squad` registration, initially with posting OFF.
+2. Verify a real secondary-account slash-command flow and the initial interaction response deadline, including cold start/DB failure cases.
+3. Review and test bot permissions, approved destination, authenticated scheduler, 36-hour expiry, late or uncertain post reconciliation, verified original-message cleanup and rollback on a controlled test channel.
+4. Review a least-privilege production credential/migration plan and get explicit permission for **each** production configuration change, public-post enablement, PR merge and launch.
 
-## Rollout rule
-No default-branch merge, deployment, production database changes, new Discord commands, or public announcements as part of this branch.
+**Never treat a passing offline test or Discord signed PING as authorization to post publicly.**
+
+More detail: [hosted staging verification](hosted-staging-status.md), [Edge release gates](edge-runtime-release-gates.md), [cleanup lifecycle](cleanup-release-gates.md), and [posting recovery](posting-recovery-plan.md).
