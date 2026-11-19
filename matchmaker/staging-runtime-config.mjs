@@ -2,18 +2,24 @@
 // secret values to a response. Supabase supplies SUPABASE_DB_URL in Edge by default.
 // This branch is staging-only: deploying it accidentally to Den Missions production
 // must not permit a database connection, even with an explicit override.
-const STAGING_ORIGIN="https://tcxktyqywsqafnyxhpgy.supabase.co";
+const STAGING_REF="tcxktyqywsqafnyxhpgy";
+const STAGING_ORIGIN="https://"+STAGING_REF+".supabase.co";
 const DEN_MISSIONS_PRODUCTION_REF="cpjcjcxinhjusosaguyi";
-function pointsAtDenMissions(databaseUrl){
- // Supabase direct hosts include the project ref in the hostname; pooler
- // connections ordinarily include it in the username (postgres.<ref>).
- // This check is defense-in-depth, not proof that a generic proxy is safe.
+function pointsAtWrongSupabaseProject(databaseUrl){
+ // Deny Den Missions, plus any OTHER recognizable Supabase project ref.
+ // Direct DB hosts carry the ref in db.<ref>.supabase.co; pooler users
+ // ordinarily carry it in postgres.<ref>. Generic/private proxies cannot
+ // be attributed by URL alone and still need independent credential review.
  try{
   const parsed=new URL(databaseUrl);
   const host=parsed.hostname.toLowerCase();
   const username=decodeURIComponent(parsed.username).toLowerCase();
-  return host.includes(DEN_MISSIONS_PRODUCTION_REF) ||
-    username.includes(DEN_MISSIONS_PRODUCTION_REF);
+  if(host.includes(DEN_MISSIONS_PRODUCTION_REF) ||
+     username.includes(DEN_MISSIONS_PRODUCTION_REF))return true;
+  const directRef=/^db\.([a-z0-9]{20})\.supabase\.co$/.exec(host)?.[1];
+  const poolerRef=/^postgres\.([a-z0-9]{20})$/.exec(username)?.[1];
+  return Boolean((directRef&&directRef!==STAGING_REF) ||
+    (poolerRef&&poolerRef!==STAGING_REF));
  }catch{return true;}
 }
 export function resolvePrivateDatabaseUrl(readEnv) {
@@ -24,12 +30,12 @@ export function resolvePrivateDatabaseUrl(readEnv) {
  if(project!==STAGING_ORIGIN)return "";
  const explicit=readEnv("DEN_MATCHMAKER_DATABASE_URL");
  if(typeof explicit==="string" && /^(postgresql|postgres):\/\//.test(explicit)){
-  if(pointsAtDenMissions(explicit))return "";
+  if(pointsAtWrongSupabaseProject(explicit))return "";
   return explicit;
  }
  const stagingUrl=readEnv("SUPABASE_DB_URL");
  if(typeof stagingUrl==="string"&&/^(postgresql|postgres):\/\//.test(stagingUrl)
-    &&!pointsAtDenMissions(stagingUrl))
+    &&!pointsAtWrongSupabaseProject(stagingUrl))
   return stagingUrl;
  return "";
 }
