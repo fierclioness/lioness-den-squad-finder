@@ -53,6 +53,9 @@ test("failed DELETE is not marked successful",async()=>{
 });
 
 test("timed out GET cannot authorize a DELETE; timed out DELETE is unresolved",async()=>{
+ // Native fetch keeps the event loop alive; our mock intentionally does not.
+ const hold=setTimeout(()=>{},400);
+ try {
  const waitForAbort=signal=>new Promise((_resolve,reject)=>{
    if(signal.aborted)return reject(signal.reason);
    signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
@@ -71,4 +74,5 @@ test("timed out GET cannot authorize a DELETE; timed out DELETE is unresolved",a
     {status:200,json:async()=>good()}:waitForAbort(init.signal)});
  await assert.rejects(stalledDelete.remove(messageId),e=>e?.name==="TimeoutError");
  assert.throws(()=>makeVerifiedBotCleanup({enabled:true,botToken,botUserId,channelId,requestTimeoutMs:0}),/timeout/);
+ } finally {clearTimeout(hold);}
 });
