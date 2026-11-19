@@ -4,6 +4,7 @@
 import {markerFor} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+class UnconfirmedOutboxState extends Error {}
 function row(result){
  if(!result||!Array.isArray(result.rows))throw Error("Invalid private query result");
  return result.rows[0]||null;
@@ -46,8 +47,10 @@ export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=
     "select game,platform,vibe,mic,timezone,availability,post_reference from matchmaker_internal.squad_listings where id=$1::bigint and status='active' and expires_at>clock_timestamp()",
     [listingId]);
    if(!listing){
-     await call("select matchmaker_internal.fail_post($1::bigint,$2::uuid,$3::boolean,$4::text) as ok",
+     const stopped=await call("select matchmaker_internal.fail_post($1::bigint,$2::uuid,$3::boolean,$4::text) as ok",
        [listingId,workerId,true,"Listing is no longer active"]);
+     if(stopped?.ok!==true)
+       throw new UnconfirmedOutboxState("Unsent state not committed; manual reconciliation required");
      return {status:"unsent",listingId};
    }
    const content=listingToMessage(listing);
@@ -65,12 +68,17 @@ export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=
     throw Error("Could not record trusted Discord receipt");
    return {status:done.result==="posted_active"?"posted":"posted_cleanup_queued",listingId,messageId:String(sent.messageId)};
   }catch(error){
+    // A false/absent database safety acknowledgement must never be reported as
+    // successful quarantine. Do not attempt a second state transition here.
+    if(error instanceof UnconfirmedOutboxState)throw error;
     // If confirmation was received but persisting it failed, DO NOT retry.
     // The row will remain "sending" and needs manual reconciliation.
     if(confirmed)throw Error("Delivery confirmed but persistence uncertain; manual reconciliation required");
     // Network timeout or other errors may represent a successful post.
-    await call("select matchmaker_internal.fail_post($1::bigint,$2::uuid,$3::boolean,$4::text) as ok",
+    const quarantined=await call("select matchmaker_internal.fail_post($1::bigint,$2::uuid,$3::boolean,$4::text) as ok",
       [listingId,workerId,false,"Delivery uncertain; manual reconciliation required"]);
+    if(quarantined?.ok!==true)
+      throw new UnconfirmedOutboxState("Post quarantine not committed; manual reconciliation required");
     return {status:"uncertain",listingId};
   }
  }
