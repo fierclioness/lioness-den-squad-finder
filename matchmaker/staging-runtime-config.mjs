@@ -5,7 +5,7 @@
 const STAGING_REF="tcxktyqywsqafnyxhpgy";
 const STAGING_ORIGIN="https://"+STAGING_REF+".supabase.co";
 const DEN_MISSIONS_PRODUCTION_REF="cpjcjcxinhjusosaguyi";
-function pointsAtWrongSupabaseProject(databaseUrl){
+export function pointsAtWrongSupabaseProject(databaseUrl){
  // Deny Den Missions, plus any OTHER recognizable Supabase project ref.
  // Direct DB hosts carry the ref in db.<ref>.supabase.co; pooler users
  // ordinarily carry it in postgres.<ref>. Generic/private proxies cannot
