@@ -51,3 +51,24 @@ test("failed DELETE is not marked successful",async()=>{
   {status:200,json:async()=>good()}:{status:429});
  await assert.rejects(x.remove(messageId),/reconciliation/);
 });
+
+test("timed out GET cannot authorize a DELETE; timed out DELETE is unresolved",async()=>{
+ const waitForAbort=signal=>new Promise((_resolve,reject)=>{
+   if(signal.aborted)return reject(signal.reason);
+   signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+ });
+ let deletes=0;
+ const stalledRead=makeVerifiedBotCleanup({enabled:true,botToken,botUserId,channelId,requestTimeoutMs:20,
+  fetchFn:async(_url,init)=>{
+    assert.equal(init.signal instanceof AbortSignal,true);
+    if(init.method==="DELETE")deletes++;
+    return waitForAbort(init.signal);
+  }});
+ await assert.rejects(stalledRead.remove(messageId),e=>e?.name==="TimeoutError");
+ assert.equal(deletes,0);
+ const stalledDelete=makeVerifiedBotCleanup({enabled:true,botToken,botUserId,channelId,requestTimeoutMs:20,
+  fetchFn:async(_url,init)=>init.method==="GET"?
+    {status:200,json:async()=>good()}:waitForAbort(init.signal)});
+ await assert.rejects(stalledDelete.remove(messageId),e=>e?.name==="TimeoutError");
+ assert.throws(()=>makeVerifiedBotCleanup({enabled:true,botToken,botUserId,channelId,requestTimeoutMs:0}),/timeout/);
+});
