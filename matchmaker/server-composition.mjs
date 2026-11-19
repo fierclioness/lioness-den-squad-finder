@@ -6,7 +6,7 @@ import {makeMatchmakerDispatcher} from "./command-dispatcher.mjs";
 import {makeMatchmakerHttpHandler} from "./http-handler.mjs";
 import {makeResponseTimingProbe} from "./response-timing.mjs";
 
-export function makeMatchmakerServer({publicKeyHex,query,enabled=false,publishingEnabled=false,clock=()=>Date.now(),onTiming=()=>{}}){
+export function makeMatchmakerServer({publicKeyHex,query,enabled=false,publishingEnabled=false,allowedTesterIds=null,clock=()=>Date.now(),onTiming=()=>{}}){
   if (typeof query !== "function") throw Error("Private database query connector required");
   if (enabled !== true && enabled !== false) throw Error("Feature gate must be a boolean");
   if (typeof publishingEnabled !== "boolean" || (publishingEnabled && !enabled))
@@ -17,7 +17,8 @@ export function makeMatchmakerServer({publicKeyHex,query,enabled=false,publishin
     clock,
     claimReplay:store.claimReplay, // Postgres primary key, persistent across workers
     dispatch:makeMatchmakerDispatcher({store,publishingEnabled}),
-    enabled
+    enabled,
+    allowedTesterIds
   });
   return makeResponseTimingProbe({handler,onResult:onTiming});
 }
