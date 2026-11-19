@@ -85,3 +85,18 @@ test("declared oversized payload is rejected before reading or storing any repla
  assert.equal(res.status,413);
  assert.equal(claims,0);
 });
+
+test("preview buttons bind publishing consent to the exact button identifiers",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ for(const [label,mode] of [["Save to /squad list","private"],["Post to #squad-up","public"]]){
+  const handle=fixture({enabled:true,dispatch:async()=>({
+   content:"Review",buttons:[{action:"confirm",token,label},{action:"cancel",token,label:"Cancel"}]
+  })});
+  const res=await handle(signed({type:2,guild_id,member,data:{name:"squad"}}));
+  assert.equal(res.status,200);
+  const body=await res.json();
+  assert.equal(body.data.flags,64);
+  assert.equal(body.data.components[0].components[0].custom_id,"mm:confirm:"+token+":"+mode);
+  assert.equal(body.data.components[0].components[1].custom_id,"mm:cancel:"+token+":"+mode);
+ }
+});
