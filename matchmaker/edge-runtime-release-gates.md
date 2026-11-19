@@ -1,6 +1,6 @@
 # Den Matchmaker Edge — staging verification and release gates
 
-**Status: deployed only in isolated staging, NOT approved for the Lioness Den production release.** The Edge entrypoint in `supabase/functions/den-matchmaker/index.ts` is deployed to **Den Matchmaker Staging** (`tcxktyqywsqafnyxhpgy`) as version 7. Den Missions production (`cpjcjcxinhjusosaguyi`) and the original manual Squad Finder have not changed.
+**Status: deployed only in isolated staging, NOT approved for the Lioness Den production release.** The Edge entrypoint in `supabase/functions/den-matchmaker/index.ts` is deployed to **Den Matchmaker Staging** (`tcxktyqywsqafnyxhpgy`) as version 8 (with safe private-confirmation queue isolation). Den Missions production (`cpjcjcxinhjusosaguyi`) and the original manual Squad Finder have not changed.
 
 ## Verified November 19, 2026
 
@@ -16,6 +16,12 @@
 - `DEN_MATCHMAKER_DATABASE_URL`: optional approved TLS private PostgreSQL connection. In the *separately isolated staging project only*, `resolvePrivateDatabaseUrl` can use Supabase's built-in `SUPABASE_DB_URL` instead. This privileged fallback is **forbidden** in Den Missions production.
 - `DEN_MATCHMAKER_COMMANDS_ENABLED` defaults to false; public posting is not implemented or enabled in this Edge runtime.
 - Discord webhook uses `verify_jwt=false` only because Discord does not send a Supabase JWT. **Raw Ed25519 signature, timestamp, durable replay claims and server-side authorization remain mandatory.**
+
+## November 19, 2026: private listing non-publication guarantee
+
+- Signed PING was confirmed on **v7**; v8 is verified through fetched deployed bundle plus GitHub-hosted health/unsigned/forged HTTP tests. A new genuine signed v8 command test has NOT occurred.
+- When publication is disabled, confirmation saves privately with **zero post-outbox jobs**, so turning on the worker later cannot publish earlier private listings. The dispatcher and storage adapter must agree on explicit public-post consent; the server denies publishing if commands are disabled.
+- Verified Node, Deno and disposable PostgreSQL CI on commit `995c7dda`, all SUCCESS. Public posting, command registration, bot installation and scheduler remain disabled.
 
 ## Gates that remain BLOCKING
 
