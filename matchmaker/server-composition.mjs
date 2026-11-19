@@ -6,6 +6,7 @@ import {makeMatchmakerDispatcher} from "./command-dispatcher.mjs";
 import {makeMatchmakerHttpHandler} from "./http-handler.mjs";
 import {makeResponseTimingProbe} from "./response-timing.mjs";
 
+/** @param {{publicKeyHex:string,query:Function,enabled?:boolean,publishingEnabled?:boolean,allowedTesterIds?:Set<string>|null,clock?:()=>number,onTiming?:(result:any)=>void}} config */
 export function makeMatchmakerServer({publicKeyHex,query,enabled=false,publishingEnabled=false,allowedTesterIds=null,clock=()=>Date.now(),onTiming=()=>{}}){
   if (typeof query !== "function") throw Error("Private database query connector required");
   if (enabled !== true && enabled !== false) throw Error("Feature gate must be a boolean");
