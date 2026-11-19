@@ -26,9 +26,11 @@ export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch
    body:JSON.stringify({content,allowed_mentions:{parse:[]}}),
    // Aborts only the HTTP attempt; delivery may already have happened.
    // The outbox MUST quarantine this as UNCERTAIN, never automatically resend.
+   redirect:"error", // never follow bot-authorized REST requests off the fixed Discord endpoint
    signal:AbortSignal.timeout(requestTimeoutMs)
   });
   // Any non-2xx response is marked ambiguous by the worker; do not blindly retry.
+  if(response.redirected===true)throw Error("Redirected delivery is untrusted");
   if(!response.ok)throw Error("Delivery not confirmed");
   let data;
   try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
