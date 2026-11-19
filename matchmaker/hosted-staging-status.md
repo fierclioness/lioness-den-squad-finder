@@ -52,6 +52,14 @@ Supabase staging security advisor reports INFO `rls_enabled_no_policy` on seven 
 - The code and new production-isolation tests passed on commit `d9e715b05137b14e31f48b85ffc30bfaaafab61f`: JS run **#44423055528**, Deno and live staging HTTP smoke run **#44423055539**, and disposable Postgres run **#44423055509**.
 - **No real Edge→PostgreSQL request has been verified yet**, because the key is not configured and the signed gateway remains fail-closed. No Discord bot token, app configuration or public posting was introduced.
 
+## Discord public key installed — hosted authentication gate verified
+
+- User saved `DEN_MATCHMAKER_DISCORD_PUBLIC_KEY` in **Den Matchmaker Staging** Edge Function secrets. Only the secret name and digest were visible in the UI; the public key was not copied into GitHub or Canva.
+- Supabase reports `den-matchmaker` version **6** after the secrets update.
+- Real hosted GitHub Actions run **#44430018684 SUCCESS**: `GET /health` HTTP 200, and unsigned `POST` HTTP **401 Unauthorized** (rather than previous 503 Not configured). This proves the configured signing public key is recognized and the authenticated request handler is running.
+- A 401 unsigned test **does not** prove a valid Discord signature, replay-claim database write, or response latency for a signed request. No bot token, Discord endpoint URL, public message or production setting was changed.
+- **Important:** The Discord application visible to the user is currently described as the Den Missions bot. Do **not** set or replace its Interactions Endpoint URL until we confirm the existing bot's command handling; changing it could interrupt Den Missions. Prefer a **separate Discord testing application** with its own public key for the staged signed-PING test, then update staging's public key securely. Any real Discord configuration needs separate approval.
+
 ## What is not yet verified
 
 - Actual HTTP invocation status/latency from a live client. External connectivity from the assistant environment could not reach the URL; Edge Function `ACTIVE` confirms deployment metadata, **not successful runtime invocation**.
