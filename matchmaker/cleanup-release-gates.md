@@ -42,3 +42,10 @@ Discord official API source: https://github.com/discord/discord-api-docs/blob/ma
 ### Still release-blocking
 
 This worker is **review-only, not scheduled or deployed**. Before enabling it, require authenticated scheduler identity, strict worker access, real fixed-channel/bot credentials, rate-limit policy, crash quarantine and manual reconciliation runbook, authorized secondary-account end-to-end verification, and owner approval for any member-facing action. The manual Squad Finder remains available.
+
+## November 19: 36-hour expiry lifecycle proposal validated (NOT deployed)
+
+- Added `expiry-outbox.review.sql` with a bounded `expire_due_listings(max_rows)` RPC intended only for a later authenticated scheduler. It atomically marks overdue active listings expired, cancels unsent pending/failed public posts, and queues cleanup **only** when an immutable, trusted original Discord posting receipt exists. `sending` and `uncertain` deliveries are not guessed, cancelled blindly or retried.
+- Validated with real **disposable PostgreSQL 17** cases: two-item bounded batches, idempotent re-run, live listing remains untouched, posted-and-receipted cleanup, unposted pending cancellation, in-flight late-success receipt queuing cleanup after expiry, and invalid batch bounds rejected. **All synthetic fixture changes rolled back** at end, preventing interference with the existing publishing integration suite.
+- GitHub Actions commit `324d8980`: JavaScript, Deno and PostgreSQL **all PASS** (including the new expiry tests).
+- This is a *review-only SQL proposal*; there is **no installed expiry scheduler**, no live Discord traffic and no staging/production migration from this new script. Authenticated scheduling and release approvals remain necessary.
