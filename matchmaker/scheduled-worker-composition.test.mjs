@@ -137,3 +137,85 @@ test("mock cleanup path GET-verifies original bot post before DELETE",async()=>{
  assert.ok(queries.some(x=>x.includes("finish_cleanup")));
  assert.equal((await handle(request("publish"))).status,403);
 });
+
+test("ambiguous outbound POST is quarantined, never automatically posted a second time",async()=>{
+ let claims=0,posts=0,unconfirmed=[],receipts=0;
+ const query=async(sql,params)=>{
+  if(sql.includes("claim_post"))
+   return {rows:[{id:claims++===0?"27":null}]};
+  if(sql.includes("from matchmaker_internal.squad_listings"))
+   return {rows:[{
+    game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",
+    timezone:"ET",availability:"Saturday evening",
+    post_reference:"11111111-1111-4111-8111-111111111111"
+   }]};
+  if(sql.includes("fail_post")){
+   unconfirmed.push(params);
+   return {rows:[{ok:true}]};
+  }
+  if(sql.includes("finish_post_with_receipt")){
+   receipts++;
+   throw Error("Receipt must not be written after an unconfirmed delivery");
+  }
+  throw Error("Unexpected private query");
+ };
+ const handle=makeScheduledWorkerComposition({
+  query,schedulerSecret:secret,schedulerEnabled:true,
+  postingEnabled:true,destinationReviewed:true,botToken:token,botUserId,channelId,
+  fetchFn:async(_url,init)=>{
+   assert.equal(init.method,"POST");
+   posts++;
+   throw Error("Simulated lost Discord response after request was sent");
+  }
+ });
+ const first=await handle(request("publish"));
+ assert.equal(first.status,200);
+ assert.deepEqual(await first.json(),{task:"publish",status:"uncertain"});
+ assert.equal(unconfirmed.length,1);
+ assert.equal(unconfirmed[0][2],false,"Must not classify possible delivery as unsent");
+ assert.equal((await handle(request("publish"))).status,200);
+ assert.equal(posts,1,"A quarantined post must never be resent automatically");
+ assert.equal(receipts,0);
+});
+test("scheduler cleanup refuses to delete a different bot's message",async()=>{
+ let claims=0,gets=0,deletes=0,finish=[];
+ const query=async(sql,params)=>{
+  if(sql.includes("claim_cleanup"))return {rows:[{listing_id:claims++===0?"27":null}]};
+  if(sql.includes("from matchmaker_internal.cleanup_outbox"))return {rows:[{
+   listing_id:"27",message_id:messageId,channel_id:channelId,bot_user_id:botUserId,
+   receipt_message_id:messageId,receipt_channel_id:channelId,
+   receipt_bot_user_id:botUserId,listing_status:"closed",
+   expires_at:"2026-11-19T00:00:00.000Z"
+  }]};
+  if(sql.includes("finish_cleanup")){
+   finish.push(params);
+   return {rows:[{ok:true}]};
+  }
+  throw Error("Unexpected private query");
+ };
+ const handle=makeScheduledWorkerComposition({
+  query,schedulerSecret:secret,schedulerEnabled:true,
+  cleanupEnabled:true,destinationReviewed:true,botToken:token,botUserId,channelId,
+  fetchFn:async(_url,init)=>{
+   if(init.method==="GET"){
+    gets++;
+    return {status:200,json:async()=>({
+     id:messageId,channel_id:channelId,
+     author:{id:"1546529501859815441",bot:true}
+    })};
+   }
+   if(init.method==="DELETE")deletes++;
+   throw Error("No DELETE should run for a foreign bot");
+  }
+ });
+ const result=await handle(request("cleanup"));
+ assert.equal(result.status,200);
+ assert.deepEqual(await result.json(),{task:"cleanup",status:"uncertain"});
+ assert.equal(gets,1);
+ assert.equal(deletes,0);
+ assert.equal(finish.length,1);
+ assert.equal(finish[0][2],false,"Unverified ownership must be quarantined");
+ const second=await handle(request("cleanup"));
+ assert.deepEqual(await second.json(),{task:"cleanup",status:"empty"});
+ assert.equal(deletes,0);
+});
