@@ -67,3 +67,32 @@ test("staging project pooler and dedicated private database configuration remain
   DEN_MATCHMAKER_DATABASE_URL:pooler
  })),pooler);
 });
+
+test("cross-project Supabase direct database addresses are rejected even when not Den Missions",()=>{
+ const other="postgresql://postgres:placeholder@db.abcdefghijklmnopqrst.supabase.co:5432/postgres";
+ for(const configKey of ["DEN_MATCHMAKER_DATABASE_URL","SUPABASE_DB_URL"]){
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   [configKey]:other
+  })),"",configKey+" must not route to another recognizable Supabase project");
+ }
+});
+test("cross-project pooler and encoded pooler username cannot bypass staging isolation",()=>{
+ const urls=[
+  "postgresql://postgres.abcdefghijklmnopqrst:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+  "postgresql://postgres%2Eabcdefghijklmnopqrst:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
+  "postgresql://postgres.tcxktyqywsqafnyxhpgy:placeholder@db.abcdefghijklmnopqrst.supabase.co:5432/postgres"
+ ];
+ for(const databaseUrl of urls)
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   DEN_MATCHMAKER_DATABASE_URL:databaseUrl
+  })),"","Any recognized mismatched project ref must fail closed");
+});
+test("recognized staging direct-host database remains allowed",()=>{
+ const db="postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co:5432/postgres?sslmode=require";
+ assert.equal(resolvePrivateDatabaseUrl(read({
+  SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+  SUPABASE_DB_URL:db
+ })),db);
+});
