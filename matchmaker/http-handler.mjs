@@ -39,8 +39,11 @@ const json=(value,status=200)=>new Response(JSON.stringify(value),{status,header
 const ephemeral=content=>({type:4,data:{flags:64,content,allowed_mentions:{parse:[]}}});
 export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,allowedTesterIds=null,clock=()=>Date.now()}){
  if(typeof enabled!=="boolean")throw Error("Invalid command feature gate");
- if(allowedTesterIds!==null && (!(allowedTesterIds instanceof Set)||[...allowedTesterIds].some(id=>!SNOWFLAKE.test(String(id)))))
+ if(allowedTesterIds!==null && (!(allowedTesterIds instanceof Set)||[...allowedTesterIds].some(id=>typeof id!=="string"||!SNOWFLAKE.test(id))))
   throw Error("Invalid tester allowlist");
+ // Freeze authorization at construction time. A caller mutating the Set later
+ // must not expand the scope of a running Discord endpoint.
+ const testerIds=allowedTesterIds===null?null:new Set(allowedTesterIds);
  // Fail closed at the signed HTTP boundary too, not only in the staging
  // environment loader. A misconfigured deployment must never authorize
  // everyone in the guild by omitting its restricted test-user list.
@@ -65,7 +68,7 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   if(interaction.guild_id!==GUILD ||
      !SNOWFLAKE.test(String(interaction.member?.user?.id||"")))
    return json(ephemeral("The Den Matchmaker is for Lioness Den members only."));
-  if(allowedTesterIds!==null && !allowedTesterIds.has(String(interaction.member.user.id)))
+  if(testerIds!==null && !testerIds.has(String(interaction.member.user.id)))
    return json(ephemeral("Den Matchmaker is currently limited to authorized testers."));
   if(!enabled || typeof dispatch!=="function")
    return json(ephemeral("Den Matchmaker is in development. The current Squad Finder is available."));
