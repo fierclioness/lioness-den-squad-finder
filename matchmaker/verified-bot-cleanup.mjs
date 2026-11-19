@@ -14,7 +14,8 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
    const url="https://discord.com/api/v10/channels/"+channelId+"/messages/"+messageId;
    const headers={authorization:"Bot "+botToken};
    // Do not delete without reading the precise original and proving authorship.
-   const lookup=await fetchFn(url,{method:"GET",headers,signal:AbortSignal.timeout(requestTimeoutMs)});
+   const lookup=await fetchFn(url,{method:"GET",headers,redirect:"error",signal:AbortSignal.timeout(requestTimeoutMs)});
+   if(lookup.redirected===true)throw Error("Redirected Discord lookup is untrusted");
    if(lookup.status===404)return {status:"already_absent"};
    if(lookup.status!==200)throw Error("Could not verify original Discord post");
    let message;
@@ -23,7 +24,8 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
       String(message?.author?.id)!==botUserId||message?.author?.bot!==true)
       throw Error("Original message was not verified as our bot's post");
    // A timed-out DELETE is ambiguous. Never declare success without a 204/404 receipt.
-   const removal=await fetchFn(url,{method:"DELETE",headers,signal:AbortSignal.timeout(requestTimeoutMs)});
+   const removal=await fetchFn(url,{method:"DELETE",headers,redirect:"error",signal:AbortSignal.timeout(requestTimeoutMs)});
+   if(removal.redirected===true)throw Error("Redirected Discord deletion is unconfirmed");
    if(removal.status===204)return {status:"deleted"};
    if(removal.status===404)return {status:"already_absent"};
    throw Error("Message deletion not confirmed; require reconciliation");
