@@ -7,6 +7,33 @@ import {makeDiscordVerifier} from "./discord-webcrypto-verifier.mjs";
 const GUILD="1546529497925296199";
 const SNOWFLAKE=/^\d{15,22}$/;
 const MAX_BODY=1024*1024;
+class BodyTooLarge extends Error {}
+// Limit streamed bodies *before* allocating/validating Ed25519 data. A hostile
+// request can omit Content-Length or lie about it; arrayBuffer() is unbounded.
+async function readLimitedBody(request){
+ const reader=request.body?.getReader();
+ if(!reader)return new Uint8Array(0);
+ let total=0;
+ const parts=[];
+ try{
+  for(;;){
+   const {done,value}=await reader.read();
+   if(done)break;
+   if(!(value instanceof Uint8Array))throw Error("Invalid request bytes");
+   total+=value.byteLength;
+   if(total>MAX_BODY)throw new BodyTooLarge("Oversized Discord payload");
+   parts.push(value);
+  }
+ }catch(error){
+  // Cancel excess streaming input; never reach signing or replay storage.
+  void reader.cancel().catch(()=>{});
+  throw error;
+ }finally{reader.releaseLock();}
+ const bytes=new Uint8Array(total);
+ let offset=0;
+ for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}
+ return bytes;
+}
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
 const ephemeral=content=>({type:4,data:{flags:64,content,allowed_mentions:{parse:[]}}});
@@ -17,15 +44,15 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   const signature=request.headers.get("x-signature-ed25519");
   const timestamp=request.headers.get("x-signature-timestamp");
   if(!signature||!timestamp)return json({error:"Unauthorized"},401);
-  if(Number(request.headers.get("content-length"))>MAX_BODY)
+  const declaredLength=request.headers.get("content-length");
+  if(declaredLength!==null && (!/^\d+$/.test(declaredLength)||Number(declaredLength)>MAX_BODY))
    return json({error:"Payload too large"},413);
   let bytes,interaction;
-  try{
-   bytes=new Uint8Array(await request.arrayBuffer());
-   interaction=await verifier.authenticate({rawBody:bytes,timestamp,signature});
-  }catch{
-   return json({error:"Unauthorized"},401);
-  }
+  try{bytes=await readLimitedBody(request);}
+  catch(error){return error instanceof BodyTooLarge
+    ? json({error:"Payload too large"},413):json({error:"Unauthorized"},401);}
+  try{interaction=await verifier.authenticate({rawBody:bytes,timestamp,signature});}
+  catch{return json({error:"Unauthorized"},401);}
   if(interaction.type===1)return json({type:1}); // Signed PING only.
   if(interaction.guild_id!==GUILD ||
      !SNOWFLAKE.test(String(interaction.member?.user?.id||"")))
