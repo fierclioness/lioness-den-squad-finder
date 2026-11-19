@@ -33,3 +33,27 @@ test("wrong listing, non-unresolved and invalid worker claims rejected",()=>{
  assert.equal(check({outbox:{...outbox,listingId:"30"}}).decision,"block");
  assert.equal(check({outbox:{...outbox,claimedBy:"not-a-uuid"}}).decision,"block");
 });
+
+// A recovered bot-owned post must not be accepted with an unknowable lifetime:
+// NaN expiration would otherwise silently suppress a required cleanup.
+test("uncertain delivery reconciliation blocks missing lifecycle or expiry evidence",()=>{
+ for(const expiresAt of [undefined,null,"invalid date",0,Number.NaN,new Date(NaN)]){
+  const result=check({listing:{...listing,status:"active",expiresAt},operatorApproved:true});
+  assert.equal(result.decision,"block","Invalid expiry must block receipt reconciliation");
+  assert.equal(result.cleanupRequired,undefined,"Do not report cleanup as unnecessary");
+ }
+ for(const status of [undefined,null,"pending","unexpected"]){
+  const result=check({listing:{...listing,status},operatorApproved:true});
+  assert.equal(result.decision,"block","Unknown lifecycle cannot authorize reconciliation");
+ }
+});
+test("verified active receipt requires cleanup on expired timestamp only",()=>{
+ const future=check({listing:{...listing,status:"active",expiresAt:"2099-12-01T00:00:00Z"},operatorApproved:true});
+ assert.equal(future.decision,"record_confirmed_receipt");
+ assert.equal(future.cleanupRequired,false);
+ const overdue=check({listing:{...listing,status:"active",expiresAt:"2000-01-01T00:00:00Z"},operatorApproved:true});
+ assert.equal(overdue.decision,"record_confirmed_receipt");
+ assert.equal(overdue.cleanupRequired,true);
+ const dateObject=check({listing:{...listing,status:"active",expiresAt:new Date("2000-01-01T00:00:00Z")},operatorApproved:true});
+ assert.equal(dateObject.cleanupRequired,true);
+});
