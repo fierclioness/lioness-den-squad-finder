@@ -85,3 +85,13 @@ Supabase staging security advisor reports INFO `rls_enabled_no_policy` on seven 
 4. Require separate approval for publishing, private schema production migration, and production release. Preserve manual Squad Finder fallback.
 
 **This is a staging verification record, not launch authorization.**
+
+## November 19: private-confirmation consent gate and staging Edge v8
+
+- **Safety issue identified and corrected:** The previous private `/squad` confirmation path called `confirm_and_enqueue` even when public posting was OFF. That left an unposted job which could have been picked up if a publishing worker was later enabled. The review branch now calls `confirm_preview` by default, saving a private listing **without enqueueing any future public post**. Only a separate explicit `publishingEnabled:true` gate calls `confirm_and_enqueue`. This gate remains **OFF** in the deployed staging entrypoint.
+- The preview/confirmation copy distinguishes **Save privately** from **Post to #squad-up**, and the dispatcher rejects a mismatch between requested publishing consent and the store's actual queue result. The server will not enable publishing while commands are disabled.
+- **Verified GitHub Actions on commit `995c7dda`:** core Node tests **#44436900562 SUCCESS**, Deno TypeScript **#44436900509 SUCCESS**, disposable PostgreSQL integration **#44436900467 SUCCESS**. New tests prove a private SQL confirmation produces **zero** post-outbox rows; the explicit publishing fixture continues testing queue + mocked Discord posting/cleanup.
+- The corrected four shared modules were deployed **only to Den Matchmaker Staging** as Edge Function **version 8**, verified by fetching the deployed bundle back. Staging commands remain OFF; no bot token or public posting transport exists in that function.
+- After v8 deployment, the GitHub-hosted *read-only/negative* staging HTTP workflow re-run **#44432676708 SUCCESS**: `/health` returns 200 with commands/posting disabled, unsigned POST returns 401, forged signed-looking PING returns 401.
+- Verified staging remains empty of user listings and post/cleanup jobs (each **0**); the single genuine prior Discord PING replay claim remains **1**. **No new genuine signed interaction was sent to v8**, so the earlier successful real Discord handshake still belongs to v7, not a fresh post-deployment handshake.
+- Production Den Missions and the original Squad Finder remain unchanged. No guild install, command registration, real Discord messages or launch authorization. Future rollout requires test-app permission, command deadline evidence, ownership-verified posting/cleanup and explicit approval.
