@@ -17,6 +17,7 @@ test("verifies author and channel before deleting exact bot post",async()=>{
   methods.push(options.method);
   assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages/"+messageId);
   assert.equal(options.headers.authorization,"Bot "+botToken);
+  assert.equal(options.redirect,"error","Do not redirect bot-authorized cleanup calls");
   return options.method==="GET"?{status:200,json:async()=>good()}:{status:204};
  });
  assert.equal((await x.remove(messageId)).status,"deleted");
@@ -75,4 +76,23 @@ test("timed out GET cannot authorize a DELETE; timed out DELETE is unresolved",a
  await assert.rejects(stalledDelete.remove(messageId),e=>e?.name==="TimeoutError");
  assert.throws(()=>makeVerifiedBotCleanup({enabled:true,botToken,botUserId,channelId,requestTimeoutMs:0}),/timeout/);
  } finally {clearTimeout(hold);}
+});
+
+test("redirected GET never authorizes DELETE; redirected DELETE never confirms cleanup",async()=>{
+ let deletes=0;
+ const redirectedRead=create(async(_url,init)=>{
+  assert.equal(init.redirect,"error");
+  if(init.method==="DELETE")deletes++;
+  return {status:200,redirected:true,json:async()=>good()};
+ });
+ await assert.rejects(redirectedRead.remove(messageId),/Redirected Discord lookup/);
+ assert.equal(deletes,0);
+ const redirectedDelete=create(async(_url,init)=>{
+  assert.equal(init.redirect,"error");
+  if(init.method==="GET")return {status:200,json:async()=>good()};
+  deletes++;
+  return {status:204,redirected:true};
+ });
+ await assert.rejects(redirectedDelete.remove(messageId),/Redirected Discord deletion/);
+ assert.equal(deletes,1,"No retry after potentially ambiguous DELETE");
 });
