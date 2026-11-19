@@ -2,8 +2,7 @@
 // Intended defense-in-depth with Supabase verify_jwt=true PLUS a separate server-side
 // x-matchmaker-scheduler-key; never a Discord app token or account password.
 // Individual workers already gate their own operations. No Discord credentials here.
-const STATUS=new Set(["disabled","empty","posted","posted_cleanup_queued","unsent","uncertain",
-  "deleted","already_absent","quarantined","complete"]);
+// An enabled task must not report another worker\'s outcome or claim success\n// while its internal feature gate is disabled. Treat mismatches as faults.\nconst TASK_STATUSES=Object.freeze({\n  publish:new Set(["empty","posted","posted_cleanup_queued","unsent","uncertain"]),\n  cleanup:new Set(["empty","deleted","already_absent","quarantined","uncertain"]),\n  maintenance:new Set(["complete"])\n});
 const HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const respond=(status,data)=>new Response(JSON.stringify(data),{status,headers:HEADERS});
 const enc=new TextEncoder();
@@ -47,7 +46,7 @@ export function makeScheduledWorkerGateway({
   if(!task.allow)return respond(403,{error:"Task disabled"});
   try{
    const outcome=await task.runner.runOnce();
-   if(!STATUS.has(outcome?.status))throw Error("Untrusted worker result");
+   if(!TASK_STATUSES[taskName].has(outcome?.status))throw Error("Unexpected or disabled worker result");
    // Never return member IDs, message IDs, tokens or internal SQL errors.
    return respond(200,{task:taskName,status:outcome.status});
   }catch{return respond(503,{error:"Worker unavailable"});}
