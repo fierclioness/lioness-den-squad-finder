@@ -10,7 +10,7 @@ test("server-side adapter calls private parameterized RPCs without posting",asyn
  const query=async(sql,params)=>{
   queries.push({sql,params});
   if(sql.includes("prepare_preview"))return {rows:[{token}]};
-  if(sql.includes("confirm_and_enqueue"))return {rows:[{id:"27"}]};
+  if(sql.includes("confirm_preview"))return {rows:[{id:"27"}]};
   if(sql.includes("cancel_preview"))return {rows:[{cancelled:true}]};
   if(sql.includes("close_with_post_guard"))return {rows:[{outcome:"closed_cleanup_queued"}]};
   if(sql.includes("claim_interaction"))return {rows:[{accepted:true}]};
@@ -18,7 +18,7 @@ test("server-side adapter calls private parameterized RPCs without posting",asyn
  };
  const store=makePostgresMatchmakerStore({query});
  assert.deepEqual(await store.prepare(actor,draft),{token});
- assert.deepEqual(await store.confirm(actor,token),{listingId:"27",publicPostCreated:false});
+ assert.deepEqual(await store.confirm(actor,token),{listingId:"27",publicPostCreated:false,queuedForPublishing:false});
  assert.equal(await store.cancel(actor,token),true);
  assert.equal(await store.close(actor),true);
  assert.equal(await store.claimReplay("1546529501859815438"),true);
@@ -33,6 +33,8 @@ test("server-side adapter calls private parameterized RPCs without posting",asyn
  }
  assert.deepEqual(queries[0].params,[actor.memberId,draft.game,draft.platform,draft.vibe,draft.mic,draft.timezone,draft.availability]);
  assert.deepEqual(queries[1].params,[actor.memberId,token]);
+ assert.match(queries[1].sql,/confirm_preview/);
+ assert.ok(queries.every(x=>!x.sql.includes("confirm_and_enqueue")));
 });
 test("owner identity, input and token are validated before database access",async()=>{
  let count=0;
@@ -52,7 +54,7 @@ test("unavailable database fails closed and no fallback is used",async()=>{
 test("dispatcher interoperates with SQL adapter without publishing",async()=>{
  const query=async(sql)=>{
   if(sql.includes("prepare_preview"))return {rows:[{token}]};
-  if(sql.includes("confirm_and_enqueue"))return {rows:[{id:"28"}]};
+  if(sql.includes("confirm_preview"))return {rows:[{id:"28"}]};
   return {rows:[]};
  };
  const dispatch=makeMatchmakerDispatcher({store:makePostgresMatchmakerStore({query})});
@@ -61,4 +63,19 @@ test("dispatcher interoperates with SQL adapter without publishing",async()=>{
  assert.equal(create.buttons[0].token,token);
  const response=await dispatch({...actor,type:3,data:{custom_id:"mm:confirm:"+token}});
  assert.match(response.content,/Nothing was posted/);
+});
+
+test("private confirmation cannot be retroactively posted when worker starts",async()=>{
+ const seen=[],query=async sql=>{seen.push(sql);return {rows:[{id:"29"}]};};
+ const privately=makePostgresMatchmakerStore({query});
+ assert.deepEqual(await privately.confirm(actor,token),{
+  listingId:"29",publicPostCreated:false,queuedForPublishing:false
+ });
+ assert.match(seen.at(-1),/confirm_preview/);
+ const publish=makePostgresMatchmakerStore({query,publishingEnabled:true});
+ assert.deepEqual(await publish.confirm(actor,token),{
+  listingId:"29",publicPostCreated:false,queuedForPublishing:true
+ });
+ assert.match(seen.at(-1),/confirm_and_enqueue/);
+ assert.throws(()=>makePostgresMatchmakerStore({query,publishingEnabled:"true"}),/flag/);
 });
