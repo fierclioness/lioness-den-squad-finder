@@ -5,6 +5,8 @@ import pg from "pg";
 import {makePostgresMatchmakerStore} from "../postgres-store-adapter.mjs";
 import {makeDiscordTransport} from "../discord-transport.mjs";
 import {makeOutboxWorker} from "../outbox-worker.mjs";
+import {makeCleanupOutboxWorker} from "../cleanup-outbox-worker.mjs";
+import {makeVerifiedBotCleanup} from "../verified-bot-cleanup.mjs";
 if(process.env.PGHOST!=="localhost"||process.env.PGDATABASE!=="matchmaker_test")
  throw Error("Refusing non-ephemeral database");
 const client=new pg.Client({host:process.env.PGHOST,port:Number(process.env.PGPORT||5432),
@@ -66,5 +68,40 @@ try {
  assert.equal(attempts,1);
  const unresolved=(await query("select state from matchmaker_internal.post_outbox where listing_id=$1",[second.listingId])).rows[0];
  assert.equal(unresolved.state,"uncertain");
- console.log("Disposable Postgres + mocked Discord transport outbox integration PASSED");
+ // Closed, already-posted listings must enter a DURABLE, bot-authorship-verified
+ // cleanup outbox. These Discord requests are MOCKS; no real messages or users.
+ assert.equal(await store.close(actor),true);
+ const pendingCleanup=(await query(
+  "select state,message_id,channel_id,bot_user_id from matchmaker_internal.cleanup_outbox where listing_id=$1",
+  [listing.listingId])).rows[0];
+ assert.deepEqual(pendingCleanup,{state:"pending",message_id:messageId,channel_id:channelId,bot_user_id:botUserId});
+ const deleteMethods=[];
+ const verifiedCleanup=makeVerifiedBotCleanup({
+  enabled:true,botToken:"testing-only-not-real-token-0123456",channelId,botUserId,
+  fetchFn:async(url,init)=>{
+   assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages/"+messageId);
+   deleteMethods.push(init.method);
+   return init.method==="GET"?
+    {status:200,json:async()=>({id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}})}:
+    {status:204};
+  }
+ });
+ const cleanupWorker=makeCleanupOutboxWorker({
+  enabled:true,query,verifiedCleanup,channelId,botUserId,
+  newWorkerId:()=>"33333333-3333-4333-8333-333333333333"
+ });
+ assert.deepEqual(await cleanupWorker.runOnce(),{status:"deleted",listingId:listing.listingId});
+ assert.deepEqual(deleteMethods,["GET","DELETE"]);
+ assert.equal((await cleanupWorker.runOnce()).status,"empty");
+ assert.deepEqual(deleteMethods,["GET","DELETE"]);
+ const cleanRecord=(await query(
+  "select state,attempts from matchmaker_internal.cleanup_outbox where listing_id=$1",
+  [listing.listingId])).rows[0];
+ assert.deepEqual(cleanRecord,{state:"done",attempts:1});
+ // Uncertain POST -> close cannot invent a receipt or guess a public message.
+ assert.equal(await store.close({guildId:actor.guildId,memberId:"1418199180287148191"}),true);
+ assert.equal((await query(
+  "select count(*)::int as count from matchmaker_internal.cleanup_outbox where listing_id=$1",
+  [second.listingId])).rows[0].count,0);
+ console.log("Disposable Postgres + mocked Discord posting AND verified cleanup integration PASSED");
 } finally {await client.end();}
