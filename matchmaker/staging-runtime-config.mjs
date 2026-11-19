@@ -29,8 +29,12 @@ export function resolvePrivateDatabaseUrl(readEnv) {
  // Production must require separate, reviewed code and user authorization.
  if(project!==STAGING_ORIGIN)return "";
  const explicit=readEnv("DEN_MATCHMAKER_DATABASE_URL");
- if(typeof explicit==="string" && /^(postgresql|postgres):\/\//.test(explicit)){
-  if(pointsAtWrongSupabaseProject(explicit))return "";
+ // If an operator specified a private override, it must be usable and
+ // staging-bound. Never silently fall back to the broader built-in URL after
+ // a bad or cross-project override: that would change the intended identity.
+ if(explicit!==undefined && explicit!==null){
+  if(typeof explicit!=="string" || !/^(postgresql|postgres):\/\//.test(explicit)
+     || pointsAtWrongSupabaseProject(explicit))return "";
   return explicit;
  }
  const stagingUrl=readEnv("SUPABASE_DB_URL");
