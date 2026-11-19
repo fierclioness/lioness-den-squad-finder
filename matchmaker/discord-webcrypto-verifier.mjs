@@ -8,6 +8,8 @@ function fromHex(input,bytes){
 }
 export function makeDiscordVerifier({publicKeyHex,claimReplay,clock=()=>Date.now(),maxAgeMs=300000}){
  if(typeof claimReplay!=="function")throw new Error("Durable replay claimant required");
+ if(typeof clock!=="function" || !Number.isSafeInteger(maxAgeMs) || maxAgeMs<1000 || maxAgeMs>300000)
+   throw new Error("Signed Discord replay age must be bounded to five minutes");
  const encoder=new TextEncoder();
  const keyPromise=crypto.subtle.importKey("raw",fromHex(publicKeyHex,32),{name:"Ed25519"},false,["verify"]);
  async function authenticate({rawBody,timestamp,signature}){
