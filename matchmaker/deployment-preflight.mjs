@@ -18,7 +18,14 @@ export function auditMatchmakerConfig(config) {
     try{url=new URL(config.databaseUrl);}catch{errors.push("Database URL is malformed");}
     if(url){
       if(url.username===""||url.password==="")errors.push("Database credentials are missing");
-      if(url.searchParams.get("sslmode")==="disable")errors.push("Database TLS must not be disabled");
+      // node-postgres interprets sslmode as a connection security hint.
+      // Never approve downgrade modes, unknown modes, or duplicate/ambiguous
+      // parameters where the client and reviewer could select different values.
+      const sslModes=[...url.searchParams].filter(([name])=>name.toLowerCase()==="sslmode").map(([,value])=>value);
+      if(sslModes.length>1 || sslModes.some(mode=>!["require","verify-ca","verify-full"].includes(mode)))
+        errors.push("Database TLS mode is insecure or ambiguous");
+      else if(sslModes.length===0 && url.hostname!=="localhost" && url.hostname!=="127.0.0.1")
+        warnings.push("Database URL omits sslmode; verify TLS and certificate checks in the runtime driver");
       if(url.hostname==="localhost"||url.hostname==="127.0.0.1")
         warnings.push("Local PostgreSQL URL is not a hosted production connection");
     }
