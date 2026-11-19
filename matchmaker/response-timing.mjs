@@ -9,19 +9,29 @@ export function makeResponseTimingProbe({handler,clock=()=>performance.now(),bud
  if(!Number.isFinite(budgetMs)||budgetMs<=0||budgetMs>=DISCORD_DEADLINE_MS)
    throw Error("Local budget must be below Discord's deadline");
  return async request=>{
+   // Telemetry must never delay, replace, or cause a second attempt at a
+   // signed interaction. A failing observer is not a Discord request failure.
+   const report=result=>{
+     try{
+       const pending=onResult(result);
+       if(pending && typeof pending.then==="function")
+         void Promise.resolve(pending).catch(()=>{});
+     }catch{/* best-effort diagnostics only */}
+   };
    const start=clock();
+   let response;
    try{
-     const response=await handler(request);
-     const elapsedMs=clock()-start;
-     const result={elapsedMs,withinLocalBudget:elapsedMs<budgetMs,
-                   withinDiscordDeadline:elapsedMs<DISCORD_DEADLINE_MS,
-                   httpStatus:response?.status??null};
-     onResult(result);return response;
+     response=await handler(request);
    }catch(error){
-     onResult({elapsedMs:clock()-start,withinLocalBudget:false,
+     report({elapsedMs:clock()-start,withinLocalBudget:false,
        withinDiscordDeadline:false,httpStatus:null});
      throw error;
    }
+   const elapsedMs=clock()-start;
+   report({elapsedMs,withinLocalBudget:elapsedMs>=0 && elapsedMs<budgetMs,
+     withinDiscordDeadline:elapsedMs>=0 && elapsedMs<DISCORD_DEADLINE_MS,
+     httpStatus:response?.status??null});
+   return response;
  };
 }
 export function evaluateTimingSamples(samples,{budgetMs=LOCAL_BUDGET_MS}={}){
