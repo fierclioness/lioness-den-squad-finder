@@ -17,6 +17,8 @@ test("preview is private and confirms only when owner clicks",async()=>{
  const dispatch=setup(),opts=Object.entries(draft).map(([name,value])=>({name,value}));
  const p=await dispatch(command(actor,"create",opts));
  assert.match(p.content,/Nothing has been posted/);
+ assert.match(p.content,/other Matchmaker users can see/);
+ assert.equal(p.buttons[0].label,"Save to /squad list");
  assert.deepEqual(p.buttons.map(x=>x.action),["confirm","cancel"]);
  assert.match((await dispatch(command(actor,"list"))).content,/No active/);
  const id="mm:confirm:"+p.buttons[0].token;
