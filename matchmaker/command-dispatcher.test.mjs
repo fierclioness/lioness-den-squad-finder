@@ -18,6 +18,8 @@ test("preview is private and confirms only when owner clicks",async()=>{
  const p=await dispatch(command(actor,"create",opts));
  assert.match(p.content,/Nothing has been posted/);
  assert.match(p.content,/other Matchmaker users can see/);
+ assert.match(p.content,/No #squad-up post or automatic DMs/);
+ assert.doesNotMatch(p.content,/Reply in #squad-up/);
  assert.equal(p.buttons[0].label,"Save to /squad list");
  assert.deepEqual(p.buttons.map(x=>x.action),["confirm","cancel"]);
  assert.match((await dispatch(command(actor,"list"))).content,/No active/);
@@ -56,6 +58,7 @@ test("publication preview requires explicit consent and matching store flag",asy
  const opts=Object.entries(draft).map(([name,value])=>({name,value}));
  const preview=await publicDispatch(command(actor,"create",opts));
  assert.match(preview.content,/PUBLIC posting/);
+ assert.match(preview.content,/Only after you confirm/);
  assert.equal(preview.buttons[0].label,"Post to #squad-up");
  assert.match((await publicDispatch(click(actor,"mm:confirm:"+token+":public"))).content,/queued for posting/);
 });
