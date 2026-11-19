@@ -151,3 +151,42 @@ test("Supabase shared pooler requires a project-scoped role for staging",()=>{
   DEN_MATCHMAKER_DATABASE_URL:custom
  })),custom);
 });
+
+test("query parameters cannot silently reroute a staging DB connection or downgrade TLS",()=>{
+ const direct="postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co:5432/postgres";
+ const disguised=[
+  "host=db.cpjcjcxinhjusosaguyi.supabase.co",
+  "HOST=evil.example.invalid",
+  "host=%2Ftmp%2Fpostgres.sock",
+  "hostaddr=127.0.0.1",
+  "user=postgres.cpjcjcxinhjusosaguyi",
+  "username=other_role",
+  "password=override",
+  "port=7654",
+  "database=otherdb",
+  "dbname=otherdb",
+  "db=otherdb",
+  "sslmode=disable",
+  "sslmode=prefer",
+  "sslmode=no-verify",
+  "sslmode=require&sslmode=disable",
+  "ssl=false",
+  "uselibpqcompat=true&sslmode=require"
+ ];
+ const fallback=direct+"?sslmode=require";
+ for(const params of disguised){
+  for(const key of ["DEN_MATCHMAKER_DATABASE_URL","SUPABASE_DB_URL"]){
+   assert.equal(resolvePrivateDatabaseUrl(read({
+    SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+    [key]:direct+"?"+params,
+    ...(key==="DEN_MATCHMAKER_DATABASE_URL"?{SUPABASE_DB_URL:fallback}:{})
+   })),"","Unsafe connection query override must be rejected: "+key+" "+params);
+  }
+ }
+ for(const mode of ["require","verify-ca","verify-full"]){
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   DEN_MATCHMAKER_DATABASE_URL:direct+"?sslmode="+mode
+  })),direct+"?sslmode="+mode);
+ }
+});
