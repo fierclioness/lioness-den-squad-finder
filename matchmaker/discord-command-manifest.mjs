@@ -13,10 +13,10 @@ export const squadCommand={
   options:[
     {type:1,name:"create",description:"Preview an optional squad listing",options:[
       field("game","Which game are you playing?",{max_length:55}),
-      field("platform","Which platform?",{choices:["Xbox","PlayStation","PC","Switch","Cross-play","Other"]}),
-      field("vibe","Casual or competitive?",{choices:["Casual","Competitive","Either"]}),
-      field("mic","Mic preference?",{choices:["Optional","Required","No mic"]}),
-      field("timezone","Approximate time zone?",{choices:["ET","CT","MT","PT","AT","UK","CET/CEST","UTC","Other"]}),
+      field("platform","Which platform?",{choices:PLATFORMS}),
+      field("vibe","Casual or competitive?",{choices:VIBES}),
+      field("mic","Mic preference?",{choices:MIC}),
+      field("timezone","Approximate time zone?",{choices:ZONES}),
       field("availability","When are you available?",{max_length:70})
     ]},
     {type:1,name:"mine",description:"See your active listing privately"},
