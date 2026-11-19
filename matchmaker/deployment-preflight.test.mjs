@@ -71,3 +71,36 @@ test("preflight rejects connection-string shadowing of host, database identity a
   assert.doesNotMatch(JSON.stringify(report),/other_password/,"No connection credentials in diagnostics");
  }
 });
+
+
+test("preflight cannot approve another Supabase project or disguised host even if all checkboxes are true",()=>{
+ const approvedEvidence={
+  ...valid,gatewayDeadlineTested:true,persistenceRuntimeTested:true,
+  guildTestAccountPassed:true,messageReconciliationTested:true,
+  privateSchemaReviewed:true,releaseApproved:true
+ };
+ const blocked=[
+  "postgresql://postgres:placeholder@db.cpjcjcxinhjusosaguyi.supabase.co:5432/postgres?sslmode=require",
+  "postgresql://postgres:placeholder@db.abcdefghijklmnopqrst.supabase.co:5432/postgres?sslmode=require",
+  "postgresql://postgres%2Ecpjcjcxinhjusosaguyi:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full",
+  "postgresql://postgres.abcdefghijklmnopqrst:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require",
+  "postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co.attacker.invalid/postgres?sslmode=require",
+  "postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co/postgres?host=evil.invalid&sslmode=require"
+ ];
+ for(const databaseUrl of blocked){
+  const result=auditMatchmakerConfig({...approvedEvidence,databaseUrl});
+  assert.equal(result.ok,false,"Blocked database must fail preflight");
+  assert.equal(result.readyForControlledTest,false,"Checklist cannot override isolation");
+  assert.ok(result.errors.some(message=>message.includes("isolated Matchmaker staging")));
+  assert.doesNotMatch(JSON.stringify(result),/placeholder|cpjcjcxinhjusosaguyi/,
+    "Preflight errors must not reveal database credentials or production identifiers");
+ }
+ for(const databaseUrl of [
+  "postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co:5432/postgres?sslmode=require",
+  "postgresql://custom_role.tcxktyqywsqafnyxhpgy:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full"
+ ]){
+  const result=auditMatchmakerConfig({...approvedEvidence,databaseUrl});
+  assert.equal(result.ok,true,"Staging host should still pass: "+databaseUrl.split("@").at(-1));
+  assert.equal(result.readyForControlledTest,true,"Only previously evidenced gates permit readiness");
+ }
+});
