@@ -16,10 +16,16 @@ test("register requires trusted receipt and never calls global commands",async()
   calls++;
   assert.match(url,/\/guilds\/1546529497925296199\/commands$/);
   assert.equal(options.headers.authorization,"Bot "+token);
-  return {ok:true,json:async()=>({name:"squad",application_id:app,guild_id:guild})};
+  return {ok:true,json:async()=>({id:"1572772707542507581",name:"squad",application_id:app,guild_id:guild})};
  };
  assert.equal((await registerTestGuildCommand({token,fetchFn})).registered,true);
  assert.equal(calls,1);
  await assert.rejects(registerTestGuildCommand({token,fetchFn:async()=>({ok:false,status:403})}),/HTTP 403/);
- await assert.rejects(registerTestGuildCommand({token,fetchFn:async()=>({ok:true,json:async()=>({name:"squad",application_id:"wrong",guild_id:guild})})}),/unexpected/);
+ await assert.rejects(registerTestGuildCommand({token,fetchFn:async()=>({ok:true,json:async()=>({id:"1572772707542507581",name:"squad",application_id:"wrong",guild_id:guild})})}),/unexpected/);
+});
+
+test("rejects a missing command ID, malformed response and timeout",async()=>{
+ await assert.rejects(registerTestGuildCommand({token,fetchFn:async()=>({ok:true,json:async()=>({name:"squad",application_id:app,guild_id:guild})})}),/unexpected/);
+ await assert.rejects(registerTestGuildCommand({token,fetchFn:async()=>({ok:true,json:async()=>{throw Error("malformed");}})}),/invalid registration receipt/);
+ await assert.rejects(registerTestGuildCommand({token,fetchFn:async(_url,opts)=>{assert.ok(opts.signal);throw Error("network timeout");}}),/network timeout/);
 });
