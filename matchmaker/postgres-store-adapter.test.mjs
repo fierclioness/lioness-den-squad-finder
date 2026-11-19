@@ -61,7 +61,7 @@ test("dispatcher interoperates with SQL adapter without publishing",async()=>{
  const fields=Object.entries(draft).map(([name,value])=>({name,value}));
  const create=await dispatch({...actor,type:2,data:{name:"squad",options:[{name:"create",options:fields}]}});
  assert.equal(create.buttons[0].token,token);
- const response=await dispatch({...actor,type:3,data:{custom_id:"mm:confirm:"+token}});
+ const response=await dispatch({...actor,type:3,data:{custom_id:"mm:confirm:"+token+":private"}});
  assert.match(response.content,/Nothing was posted/);
 });
 
