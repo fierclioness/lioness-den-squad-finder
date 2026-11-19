@@ -52,3 +52,36 @@ test("unavailable replay ledger denies valid signed request",async()=>{
  const handle=makeMatchmakerHttpHandler({publicKeyHex:hex,clock:()=>now,claimReplay:async()=>{throw Error("db down");}});
  assert.equal((await handle(signed({type:1}))).status,401);
 });
+
+test("streamed payload without Content-Length is bounded before signature or replay storage",async()=>{
+ let claims=0,pulls=0;
+ const handle=fixture({claimReplay:async()=>{claims++;return true;}});
+ const stream=new ReadableStream({
+  pull(controller){
+   pulls++;
+   if(pulls>8)return controller.close();
+   controller.enqueue(new Uint8Array(256*1024));
+  }
+ });
+ const req=new Request("https://example.invalid/functions/v1/den-matchmaker",{
+  method:"POST",duplex:"half",
+  headers:{"x-signature-ed25519":"00".repeat(64),"x-signature-timestamp":ts},
+  body:stream
+ });
+ const res=await handle(req);
+ assert.equal(res.status,413);
+ assert.deepEqual(await res.json(),{error:"Payload too large"});
+ assert.equal(claims,0);
+ assert.ok(pulls<=8,"Must stop reading once the limit is crossed");
+});
+test("declared oversized payload is rejected before reading or storing any replay ID",async()=>{
+ let claims=0;
+ const handle=fixture({claimReplay:async()=>{claims++;return true;}});
+ const req=new Request("https://example.invalid",{
+  method:"POST",headers:{"content-length":"1048577",
+   "x-signature-ed25519":"00".repeat(64),"x-signature-timestamp":ts},body:"{}"
+ });
+ const res=await handle(req);
+ assert.equal(res.status,413);
+ assert.equal(claims,0);
+});
