@@ -2,7 +2,13 @@
 // Intended defense-in-depth with Supabase verify_jwt=true PLUS a separate server-side
 // x-matchmaker-scheduler-key; never a Discord app token or account password.
 // Individual workers already gate their own operations. No Discord credentials here.
-// An enabled task must not report another worker\'s outcome or claim success\n// while its internal feature gate is disabled. Treat mismatches as faults.\nconst TASK_STATUSES=Object.freeze({\n  publish:new Set(["empty","posted","posted_cleanup_queued","unsent","uncertain"]),\n  cleanup:new Set(["empty","deleted","already_absent","quarantined","uncertain"]),\n  maintenance:new Set(["complete"])\n});
+// An enabled task must not report another worker's outcome or claim success
+// while its internal feature gate is disabled. Treat mismatches as faults.
+const TASK_STATUSES=Object.freeze({
+  publish:new Set(["empty","posted","posted_cleanup_queued","unsent","uncertain"]),
+  cleanup:new Set(["empty","deleted","already_absent","quarantined","uncertain"]),
+  maintenance:new Set(["complete"])
+});
 const HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const respond=(status,data)=>new Response(JSON.stringify(data),{status,headers:HEADERS});
 const enc=new TextEncoder();
