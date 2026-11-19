@@ -1,4 +1,6 @@
--- REVIEW ONLY: disposable PostgreSQL CI, NOT production/staging migration.
+-- SOURCE REVIEW: exercised in disposable PostgreSQL CI and installed ONLY in isolated
+-- Den Matchmaker STAGING as migration matchmaker_staging_reviewed_expiry_rpc.
+-- NOT approved for production; never run a scheduler without separate review.
 -- Called only by an authenticated server-only scheduler after approval.
 -- Expires due opt-in listings in bounded batches, cancels unsent post jobs,
 -- and atomically queues cleanup only for verified original bot receipts.
