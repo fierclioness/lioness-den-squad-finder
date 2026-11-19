@@ -21,7 +21,7 @@ test("preview is private and confirms only when owner clicks",async()=>{
  assert.equal(p.buttons[0].label,"Save to /squad list");
  assert.deepEqual(p.buttons.map(x=>x.action),["confirm","cancel"]);
  assert.match((await dispatch(command(actor,"list"))).content,/No active/);
- const id="mm:confirm:"+p.buttons[0].token;
+ const id="mm:confirm:"+p.buttons[0].token+":private";
  await assert.rejects(dispatch(click(stranger,id)),/not yours/);
  assert.match((await dispatch(click(actor,id))).content,/Nothing was posted/);
  await assert.rejects(dispatch(click(actor,id)),/used/);
@@ -32,8 +32,8 @@ test("preview is private and confirms only when owner clicks",async()=>{
 test("cancel invalidates token, no listing is created",async()=>{
  const dispatch=setup(),opts=Object.entries(draft).map(([name,value])=>({name,value}));
  const p=await dispatch(command(actor,"create",opts)),token=p.buttons[0].token;
- assert.match((await dispatch(click(actor,"mm:cancel:"+token))).content,/cancelled/);
- await assert.rejects(dispatch(click(actor,"mm:confirm:"+token)),/not yours/);
+ assert.match((await dispatch(click(actor,"mm:cancel:"+token+":private"))).content,/cancelled/);
+ await assert.rejects(dispatch(click(actor,"mm:confirm:"+token+":private")),/not yours/);
  assert.match((await dispatch(command(actor,"list"))).content,/No active/);
 });
 test("reject bad guild, missing methods and unsafe draft",async()=>{
@@ -58,4 +58,18 @@ test("publication preview requires explicit consent and matching store flag",asy
  assert.match(preview.content,/PUBLIC posting/);
  assert.equal(preview.buttons[0].label,"Post to #squad-up");
  assert.match((await publicDispatch(click(actor,"mm:confirm:"+token))).content,/queued for posting/);
+});
+
+test("old private preview cannot be published after flag switches",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ let confirms=0;
+ const store={prepare:async()=>({token}),confirm:async()=>{confirms++;return {publicPostCreated:false,queuedForPublishing:true};},cancel:async()=>true,mine:async()=>null,list:async()=>[],close:async()=>false};
+ const published=makeMatchmakerDispatcher({store,publishingEnabled:true});
+ const privatePreview="mm:confirm:"+token+":private";
+ const result=await published(click(actor,privatePreview));
+ assert.match(result.content,/settings changed/);
+ assert.equal(confirms,0);
+ const oldButton=await published(click(actor,"mm:confirm:"+token));
+ assert.match(oldButton.content,/no longer available/);
+ assert.equal(confirms,0);
 });
