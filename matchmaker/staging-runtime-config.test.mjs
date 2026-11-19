@@ -96,3 +96,27 @@ test("recognized staging direct-host database remains allowed",()=>{
   SUPABASE_DB_URL:db
  })),db);
 });
+
+test("invalid explicit private override must not silently use privileged staging fallback",()=>{
+ const fallback="postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co/postgres";
+ for(const bad of ["", "https://example.test", "not-a-url", 23, true]){
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   DEN_MATCHMAKER_DATABASE_URL:bad,
+   SUPABASE_DB_URL:fallback
+  })),"","Invalid explicit override must deny, never fall back");
+ }
+});
+test("cross-project explicit override must not silently use otherwise valid built-in URL",()=>{
+ const fallback="postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co/postgres";
+ for(const bad of [
+  "postgresql://postgres.abcdefghijklmnopqrst:placeholder@aws-0-us-east-1.pooler.supabase.com/postgres",
+  "postgresql://postgres:placeholder@db.abcdefghijklmnopqrst.supabase.co/postgres"
+ ]){
+  assert.equal(resolvePrivateDatabaseUrl(read({
+   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
+   DEN_MATCHMAKER_DATABASE_URL:bad,
+   SUPABASE_DB_URL:fallback
+  })),"","Cross-project explicit override must deny, never fall back");
+ }
+});
