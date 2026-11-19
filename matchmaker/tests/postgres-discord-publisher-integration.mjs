@@ -15,7 +15,8 @@ await client.connect();
 try {
  await client.query("SET ROLE service_role");
  const query=(sql,params)=>client.query(sql,params);
- const store=makePostgresMatchmakerStore({query});
+ // Only this disposable test opts into publishing; all Discord transport is mocked.
+ const store=makePostgresMatchmakerStore({query,publishingEnabled:true});
  const actor={guildId:"1546529497925296199",memberId:"1418199180287148190"};
  const draft={game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Weekends"};
  const preview=await store.prepare(actor,draft);
