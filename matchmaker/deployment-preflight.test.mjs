@@ -52,3 +52,22 @@ test("preflight rejects downgrade, unknown and ambiguous PostgreSQL SSL modes",(
  assert.ok(missing.warnings.some(message=>message.includes("omits sslmode")));
  assert.equal(missing.readyForControlledTest,false,"warnings are not launch approval");
 });
+
+test("preflight rejects connection-string shadowing of host, database identity and TLS",()=>{
+ const base="postgresql://staging_role:placeholder@pooler.example.internal:5432/matchmaker";
+ for(const fragment of [
+  "host=other-project.invalid",
+  "HOST=%2Fvar%2Frun%2Fpostgresql",
+  "hostaddr=127.0.0.1",
+  "user=other_role","password=other_password",
+  "port=9876","database=production","dbname=production",
+  "ssl=false","ssl=true","uselibpqcompat=true&sslmode=require"
+ ]){
+  const report=auditMatchmakerConfig({...valid,databaseUrl:base+"?"+fragment});
+  assert.equal(report.ok,false,fragment);
+  assert.equal(report.readyForControlledTest,false,fragment);
+  assert.ok(report.errors.some(message=>message.includes("connection identity")||
+    message.includes("TLS override")),fragment);
+  assert.doesNotMatch(JSON.stringify(report),/other_password/,"No connection credentials in diagnostics");
+ }
+});
