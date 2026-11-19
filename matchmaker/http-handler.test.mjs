@@ -109,6 +109,25 @@ test("enabled commands cannot accidentally authorize the whole guild",()=>{
  // Explicitly disabled signed PING remains available before a tester list is configured.
  assert.doesNotThrow(()=>fixture({enabled:false,allowedTesterIds:null}));
 });
+test("tester authorization is immutable after setup and requires exact string IDs",async()=>{
+ const initial=new Set([member.user.id]);
+ let dispatches=0;
+ const handle=fixture({enabled:true,allowedTesterIds:initial,
+   dispatch:async()=>{dispatches++;return {content:"authorized"};}});
+ // Simulate an accidental or malicious mutation in the deployment config.
+ initial.clear();
+ initial.add("1546529501859815438");
+ const valid=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+ assert.equal(valid.data.content,"authorized");
+ const stranger={user:{id:"1546529501859815438"}};
+ const denied=await (await handle(signed({type:2,guild_id,member:stranger,data:{name:"squad"}}))).json();
+ assert.match(denied.data.content,/authorized testers/);
+ assert.equal(dispatches,1,"A mutated source Set cannot grant extra access");
+ for(const invalid of [1418199180287148073n,1418199180287148073,null,{}]){
+  assert.throws(()=>fixture({enabled:true,allowedTesterIds:new Set([invalid])}),/tester allowlist/);
+ }
+});
+
 test("restricted staging test allowlist rejects other members before dispatch",async()=>{
  let calls=0;
  const handle=fixture({enabled:true,allowedTesterIds:new Set(["1418199180287148073"]),dispatch:async()=>{calls++;return {content:"ok"};}});
