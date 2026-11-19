@@ -34,7 +34,11 @@ function system(){
  };
  const replay=new Set();
  return makeMatchmakerHttpHandler({
-  publicKeyHex,clock:()=>now,enabled:true,dispatch:makeMatchmakerDispatcher({store}),
+  publicKeyHex,clock:()=>now,enabled:true,
+  // Both are explicit mock testers so stolen-preview rejection exercises
+  // token ownership, not just the surrounding allowlist check.
+  allowedTesterIds:new Set([member.user.id,other.user.id]),
+  dispatch:makeMatchmakerDispatcher({store}),
   claimReplay:async id=>{if(replay.has(id))return false;replay.add(id);return true;}
  });
 }
