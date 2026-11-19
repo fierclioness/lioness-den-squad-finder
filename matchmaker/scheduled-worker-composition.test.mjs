@@ -35,7 +35,7 @@ test("independent review, credentials and scheduler secret are all required",()=
  assert.throws(()=>makeScheduledWorkerComposition({
   query,fetchFn,cleanupEnabled:true,schedulerEnabled:true,schedulerSecret:secret,
   destinationReviewed:true,channelId,botUserId,botToken:""
- }),/credentials/);
+ }),/bot identity|credentials/);
  assert.throws(()=>makeScheduledWorkerComposition({
   query,fetchFn,maintenanceEnabled:true,schedulerEnabled:true
  }),/scheduler secret/);
