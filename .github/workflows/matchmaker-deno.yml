@@ -47,10 +47,13 @@ jobs:
         run: |
           set -euo pipefail
           code=$(curl --silent --show-error --max-time 20 --output /tmp/den_noauth.json --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$STAGING_URL")
-          test "$code" = "503"
+          echo "Unsigned staging POST HTTP status: $code"
+          head -c 250 /tmp/den_noauth.json || true
+          echo
+          test "$code" = "401"
           python3 - <<'PY'
           import json
           with open('/tmp/den_noauth.json') as f: data=json.load(f)
-          assert data.get('error') == 'Not configured', data
-          print('Unsigned POST rejected; command endpoint remains disabled')
+          assert data.get('error') == 'Unauthorized', data
+          print('PASS: public signing key loaded, unsigned POST rejected with 401')
           PY
