@@ -100,3 +100,17 @@ test("preview buttons bind publishing consent to the exact button identifiers",a
   assert.equal(body.data.components[0].components[1].custom_id,"mm:cancel:"+token+":"+mode);
  }
 });
+
+test("restricted staging test allowlist rejects other members before dispatch",async()=>{
+ let calls=0;
+ const handle=fixture({enabled:true,allowedTesterIds:new Set(["1418199180287148073"]),dispatch:async()=>{calls++;return {content:"ok"};}});
+ const stranger={user:{id:"1546529501859815438"}};
+ const denied=await (await handle(signed({type:2,guild_id,member:stranger,data:{name:"squad"}}))).json();
+ assert.match(denied.data.content,/authorized testers/);
+ assert.equal(denied.data.flags,64);
+ assert.equal(calls,0);
+ const allowed=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+ assert.equal(allowed.data.content,"ok");
+ assert.equal(calls,1);
+ assert.throws(()=>fixture({allowedTesterIds:new Set(["bad"])}),/allowlist/);
+});
