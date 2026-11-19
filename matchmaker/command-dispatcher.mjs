@@ -4,9 +4,10 @@ import {validateDraft,formatPreview} from "./matchmaker-core.mjs";
 const guild="1546529497925296199";
 const fields=["game","platform","vibe","mic","timezone","availability"];
 const option=(options,name)=>options.find(x=>x?.name===name)?.value;
-export function makeMatchmakerDispatcher({store}){
+export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
  const methods=["prepare","confirm","cancel","mine","list","close"];
  if(!store||methods.some(k=>typeof store[k]!=="function"))throw Error("Complete trusted storage adapter required");
+ if(typeof publishingEnabled!=="boolean")throw Error("Publishing feature flag must be a boolean");
  return async input=>{
   if(input?.guildId!==guild||!/^\d{15,22}$/.test(String(input.memberId||"")))
    throw Error("Invalid signed actor");
@@ -18,8 +19,11 @@ export function makeMatchmakerDispatcher({store}){
     const draft=validateDraft(Object.fromEntries(fields.map(k=>[k,option(opts,k)])));
     const preview=await store.prepare(actor,draft);
     if(!/^[0-9a-f-]{36}$/i.test(String(preview?.token||"")))throw Error("Invalid preview token");
-    return {content:"Review your squad request. Nothing has been posted.\n\n"+formatPreview(draft),
-      buttons:[{action:"confirm",token:preview.token,label:"Confirm"},{action:"cancel",token:preview.token,label:"Cancel"}]};
+    const consent=publishingEnabled
+      ? "Confirming queues this opt-in listing for PUBLIC posting in #squad-up. Nothing has been posted yet."
+      : "Nothing has been posted. Confirming saves this listing privately; it will NOT be automatically published later.";
+    return {content:"Review your squad request. "+consent+"\n\n"+formatPreview(draft),
+      buttons:[{action:"confirm",token:preview.token,label:publishingEnabled?"Post to #squad-up":"Save privately"},{action:"cancel",token:preview.token,label:"Cancel"}]};
    }
    if(sub?.name==="mine"){
     const item=await store.mine(actor);
@@ -41,8 +45,12 @@ export function makeMatchmakerDispatcher({store}){
     await store.cancel(actor,match[2]);return {content:"Preview cancelled. Nothing was posted."};
    }
    const result=await store.confirm(actor,match[2]);
-   if(result?.publicPostCreated!==false)throw Error("Unexpected posting behavior");
-   return {content:"Your squad request was saved privately. Nothing was posted to Discord because publishing is not enabled."};
+   if(result?.publicPostCreated!==false ||
+      (publishingEnabled ? result.queuedForPublishing!==true : result.queuedForPublishing===true))
+     throw Error("Inconsistent publishing consent or unexpected posting behavior");
+   return {content:publishingEnabled
+      ? "Your opted-in squad request was queued for posting in #squad-up. It may take a moment to appear."
+      : "Your squad request was saved privately. Nothing was posted or queued; turning on posting later will not publish this listing."};
   }
   return {content:"Unsupported action."};
  };
