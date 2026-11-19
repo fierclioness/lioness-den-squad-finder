@@ -35,16 +35,37 @@ jobs:
           }, f'Unexpected staging health JSON: {data}'
           print('PASS: real hosted staging health GET, no database writes')
           PY
-      - name: Verify unsigned POST fails closed without secrets
+      - name: Verify unsigned POST fails closed with configured signing key
         env:
           STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
         run: |
           set -euo pipefail
           code=$(curl --silent --show-error --max-time 18 --output /tmp/den_noauth.json --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$STAGING_URL")
-          test "$code" = "503"
+          test "$code" = "401"
           python3 - <<'PY'
           import json
           with open('/tmp/den_noauth.json') as f: data=json.load(f)
-          assert data.get('error') == 'Not configured', data
-          print('PASS: unsigned POST rejected; staging commands cannot run')
+          assert data == {'error':'Unauthorized'}, data
+          print('PASS: unsigned POST rejected with 401; no command executed')
+          PY
+      - name: Verify forged Discord-style signature is denied (no replay claim)
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          # A forged signature must be rejected BEFORE the private DB replay claimant.
+          # Synthetic interaction ID is invalidly signed and never processed.
+          timestamp=$(date +%s)
+          signature=$(printf '0%.0s' {1..128})
+          code=$(curl --silent --show-error --max-time 18 --output /tmp/den_forged.json --write-out '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            -H "x-signature-timestamp: ${timestamp}" \
+            -H "x-signature-ed25519: ${signature}" \
+            --data '{"id":"1546529501859815438","type":1}' "${STAGING_URL}")
+          test "$code" = "401"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_forged.json') as f: data=json.load(f)
+          assert data == {'error':'Unauthorized'}, data
+          print('PASS: forged signed-looking Discord PING rejected by hosted Edge')
           PY
