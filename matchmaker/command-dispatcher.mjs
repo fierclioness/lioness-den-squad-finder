@@ -21,9 +21,9 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
     if(!/^[0-9a-f-]{36}$/i.test(String(preview?.token||"")))throw Error("Invalid preview token");
     const consent=publishingEnabled
       ? "Confirming queues this opt-in listing for PUBLIC posting in #squad-up. Nothing has been posted yet."
-      : "Nothing has been posted. Confirming saves this listing privately; it will NOT be automatically published later.";
+      : "Nothing has been posted. Confirming saves a discoverable opt-in listing: other Matchmaker users can see these game preferences with /squad list. No #squad-up post is queued now or later.";
     return {content:"Review your squad request. "+consent+"\n\n"+formatPreview(draft),
-      buttons:[{action:"confirm",token:preview.token,label:publishingEnabled?"Post to #squad-up":"Save privately"},{action:"cancel",token:preview.token,label:"Cancel"}]};
+      buttons:[{action:"confirm",token:preview.token,label:publishingEnabled?"Post to #squad-up":"Save to /squad list"},{action:"cancel",token:preview.token,label:"Cancel"}]};
    }
    if(sub?.name==="mine"){
     const item=await store.mine(actor);
@@ -50,7 +50,7 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
      throw Error("Inconsistent publishing consent or unexpected posting behavior");
    return {content:publishingEnabled
       ? "Your opted-in squad request was queued for posting in #squad-up. It may take a moment to appear."
-      : "Your squad request was saved privately. Nothing was posted or queued; turning on posting later will not publish this listing."};
+      : "Your opt-in listing is visible to other Matchmaker users via /squad list. Nothing was posted or queued to #squad-up; enabling posting later will not publish it."};
   }
   return {content:"Unsupported action."};
  };
