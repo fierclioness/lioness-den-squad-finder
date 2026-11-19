@@ -1,6 +1,9 @@
 \set ON_ERROR_STOP on
 -- Disposable PostgreSQL 17 only. NEVER against hosted projects.
 \ir ../expiry-outbox.review.sql
+-- Persist the function definition but roll back all synthetic expiry fixtures.
+-- This prevents future disposable integration tests from claiming test jobs.
+BEGIN;
 SET ROLE service_role;
 DO $$
 declare
@@ -84,4 +87,5 @@ begin
  end;
 end $$;
 RESET ROLE;
-SELECT 'Bounded expiry, confirmed cleanup, unsent cancellation and late receipt PASSED' as result;
+ROLLBACK;
+SELECT 'Bounded expiry, confirmed cleanup, unsent cancellation and late receipt PASSED (fixture rolled back)' as result;
