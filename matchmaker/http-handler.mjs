@@ -38,8 +38,14 @@ const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-cont
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
 const ephemeral=content=>({type:4,data:{flags:64,content,allowed_mentions:{parse:[]}}});
 export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,allowedTesterIds=null,clock=()=>Date.now()}){
+ if(typeof enabled!=="boolean")throw Error("Invalid command feature gate");
  if(allowedTesterIds!==null && (!(allowedTesterIds instanceof Set)||[...allowedTesterIds].some(id=>!SNOWFLAKE.test(String(id)))))
   throw Error("Invalid tester allowlist");
+ // Fail closed at the signed HTTP boundary too, not only in the staging
+ // environment loader. A misconfigured deployment must never authorize
+ // everyone in the guild by omitting its restricted test-user list.
+ if(enabled && (!(allowedTesterIds instanceof Set)||allowedTesterIds.size===0))
+  throw Error("Enabled commands require a nonempty tester allowlist");
  const verifier=makeDiscordVerifier({publicKeyHex,claimReplay,clock});
  return async function handle(request){
   if(request.method!=="POST")return json({error:"Method not allowed"},405);
