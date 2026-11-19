@@ -50,7 +50,7 @@ export function makeScheduledWorkerGateway({
   let taskName;
   try{
    const path=new URL(request.url).pathname;
-   taskName=/^(?:\\/run|\\/den-matchmaker-worker|\\/functions\\/v1\\/den-matchmaker-worker)\\/(publish|cleanup|maintenance)$/.exec(path)?.[1];
+   taskName=new RegExp("^(?:/run|/den-matchmaker-worker|/functions/v1/den-matchmaker-worker)/(publish|cleanup|maintenance)$").exec(path)?.[1];
   }catch{return respond(404,{error:"Not found"});}
   if(!taskName)return respond(404,{error:"Not found"});
   const task=tasks[taskName];
