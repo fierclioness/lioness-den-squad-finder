@@ -49,6 +49,8 @@ export function makeResponseTimingProbe({handler,clock=()=>performance.now(),bud
  };
 }
 export function evaluateTimingSamples(samples,{budgetMs=LOCAL_BUDGET_MS}={}){
+ if(!Number.isFinite(budgetMs)||budgetMs<=0||budgetMs>=DISCORD_DEADLINE_MS)
+  throw Error("Local budget must be below Discord's deadline");
  if(!Array.isArray(samples)||samples.length===0||samples.some(x=>!Number.isFinite(x)||x<0))
   throw Error("Valid timing samples required");
  const sorted=[...samples].sort((a,b)=>a-b);
