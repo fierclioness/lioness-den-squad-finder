@@ -8,6 +8,16 @@ on:
       - '.github/workflows/matchmaker-staging-http.yml'
       - 'supabase/functions/den-matchmaker/**'
       - 'matchmaker/staging-health.mjs'
+      # Exercise the real hosted endpoint when ANY bundled runtime code changes,
+      # not only when the function entrypoint or health-only route changes.
+      - 'matchmaker/server-composition.mjs'
+      - 'matchmaker/postgres-store-adapter.mjs'
+      - 'matchmaker/matchmaker-core.mjs'
+      - 'matchmaker/command-dispatcher.mjs'
+      - 'matchmaker/http-handler.mjs'
+      - 'matchmaker/discord-webcrypto-verifier.mjs'
+      - 'matchmaker/response-timing.mjs'
+      - 'matchmaker/staging-runtime-config.mjs'
 permissions:
   contents: read
 jobs:
