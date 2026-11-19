@@ -2,8 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {planCleanup,makeMessageCleanupTransport} from "./listing-cleanup.mjs";
 const id="1546529501859815438",channel="1546529497925296199";
+const botUserId="1546529501859815439";
 const row={status:"active",expiresAtMs:1000,postState:"posted",botOwned:true,messageId:id,channelId:channel};
 const token="local-fake-not-a-real-token-12345";
+const endpoint="https://discord.com/api/v10/channels/"+channel+"/messages/"+id;
+const receipt=()=>({id,channel_id:channel,author:{id:botUserId,bot:true}});
 test("active requests do not get deleted; closed or expired can",()=>{
  assert.equal(planCleanup(row,{now:999}).action,"none");
  assert.equal(planCleanup({...row,status:"closed"},{now:999}).action,"delete");
@@ -17,24 +20,46 @@ test("never delete posts with ambiguous receipt, wrong owner or missing channel"
  assert.equal(planCleanup({...row,messageId:null},{now:2000}).action,"manual");
  assert.equal(planCleanup({...row,postState:"pending"},{now:2000}).action,"none");
 });
-test("transport is disabled by default and only deletes confirmed fixed-channel post",async()=>{
+test("transport is disabled by default; enabled requires independent bot identity",async()=>{
  let calls=0;
  const disabled=makeMessageCleanupTransport({fetchFn:async()=>{calls++;throw Error("Unexpected");}});
  await assert.rejects(disabled.removeConfirmedBotPost({action:"delete",channelId:channel,messageId:id}),/disabled/);
  assert.equal(calls,0);
- const enabled=makeMessageCleanupTransport({enabled:true,botToken:token,channelId:channel,
+ assert.throws(()=>makeMessageCleanupTransport({enabled:true,botToken:token,channelId:channel}),/identity/);
+});
+test("fixed-channel cleanup verifies exact bot-owned message with GET before DELETE",async()=>{
+ const methods=[];
+ const enabled=makeMessageCleanupTransport({enabled:true,botToken:token,botUserId,channelId:channel,
   fetchFn:async(url,opt)=>{
-   calls++;assert.equal(url,"https://discord.com/api/v10/channels/"+channel+"/messages/"+id);
-   assert.equal(opt.method,"DELETE");return {status:204};
+   assert.equal(url,endpoint);
+   assert.equal(opt.headers.authorization,"Bot "+token);
+   methods.push(opt.method);
+   return opt.method==="GET"?{status:200,json:async()=>receipt()}:{status:204};
   }});
  assert.equal((await enabled.removeConfirmedBotPost(planCleanup(row,{now:2000}))).status,"deleted");
- assert.equal(calls,1);
+ assert.deepEqual(methods,["GET","DELETE"]);
  await assert.rejects(enabled.removeConfirmedBotPost({action:"delete",channelId:"999999999999999999",messageId:id}),/Unverified/);
- assert.equal(calls,1);
+ assert.deepEqual(methods,["GET","DELETE"]);
 });
-test("only verified absence is terminal, errors remain unresolved",async()=>{
- const missing=makeMessageCleanupTransport({enabled:true,botToken:token,channelId:channel,fetchFn:async()=>({status:404})});
+test("wrong author or bot identity blocks DELETE even with a trusted DB plan",async()=>{
+ for(const author of [{id:"1418199180287148073",bot:false},{id:"1546529501859815411",bot:true}]){
+  let deletions=0;
+  const t=makeMessageCleanupTransport({enabled:true,botToken:token,botUserId,channelId:channel,
+   fetchFn:async(_url,opts)=>{
+    if(opts.method==="DELETE")deletions++;
+    return {status:200,json:async()=>({...receipt(),author})};
+   }});
+  await assert.rejects(t.removeConfirmedBotPost(planCleanup(row,{now:2000})),/not verified/);
+  assert.equal(deletions,0);
+ }
+});
+test("only verified absence is terminal; Discord API errors remain unresolved",async()=>{
+ const base={enabled:true,botToken:token,botUserId,channelId:channel};
+ const missing=makeMessageCleanupTransport({...base,fetchFn:async()=>({status:404})});
  assert.equal((await missing.removeConfirmedBotPost(planCleanup(row,{now:2000}))).status,"already_absent");
- const unknown=makeMessageCleanupTransport({enabled:true,botToken:token,channelId:channel,fetchFn:async()=>({status:429})});
- await assert.rejects(unknown.removeConfirmedBotPost(planCleanup(row,{now:2000})),/reconciliation/);
+ const unauthorized=makeMessageCleanupTransport({...base,fetchFn:async()=>({status:429})});
+ await assert.rejects(unauthorized.removeConfirmedBotPost(planCleanup(row,{now:2000})),/Could not verify/);
+ const failedDeletion=makeMessageCleanupTransport({...base,fetchFn:async(_url,opts)=>opts.method==="GET"?
+   {status:200,json:async()=>receipt()}:{status:429}});
+ await assert.rejects(failedDeletion.removeConfirmedBotPost(planCleanup(row,{now:2000})),/reconciliation/);
 });
