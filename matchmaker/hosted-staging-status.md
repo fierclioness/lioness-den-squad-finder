@@ -1,5 +1,9 @@
 # Den Matchmaker Staging — hosted implementation record
 
+## Nov 19, 2026 — verified offline reconciliation safety (review-only)
+
+The uncertain-delivery reconciliation engine now refuses to record an operator-approved recovered Discord post if the corresponding private listing status or expiry is unknown, missing, or invalid. Previously an invalid expiration could suppress cleanup for an active listing; the decision now BLOCKS pending authoritative lifecycle evidence. Valid future-active and expired/inactive cases continue returning the right cleanup requirement. Two new regression tests; code commit 8a08b062 and tests commit 599e192e. Verified **167/167 Node tests PASS** ([core #44632951771](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44632951771)), [Edge TypeScript #44632951733](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44632951733) PASS, [disposable PostgreSQL #44632951577](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44632951577) PASS. These are offline tests, not real Discord posts or deletions. Fresh read-only staging inventory: Edge Function v17 ACTIVE; seven RLS-enabled private tables; zero listings, pending previews, publishing jobs, cleanup jobs, receipts, or reconciliation audits; one genuine prior signed-PING replay record. Security advisor: seven INFO RLS-without-policy notes consistent with intentionally private, deny-by-default tables. No stage redeployment; commands/posting/scheduler remain OFF, PR #2 draft/unmerged, production Den Missions and the manual Squad Finder untouched. Real tester /squad ACK, authorized bot-owned lifecycle and worker deployment remain gated.
+
 **Date:** November 18, 2026
 **Environment:** dedicated Supabase project Den Matchmaker Staging, `tcxktyqywsqafnyxhpgy` (us-east-1, PostgreSQL 17).
 **Production project:** Den Missions 2.0, `cpjcjcxinhjusosaguyi` — untouched, verified healthy and still has no Matchmaker tables.
