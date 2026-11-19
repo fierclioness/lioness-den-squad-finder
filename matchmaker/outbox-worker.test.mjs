@@ -66,3 +66,46 @@ test("confirmed delivery with failed database write raises without resending",as
  await assert.rejects(worker.runOnce(),/manual reconciliation/);
  assert.equal(sends,1);
 });
+
+test("false quarantine acknowledgement must fail closed instead of reporting an uncertain state",async()=>{
+ let sends=0,failCalls=0;
+ const query=async s=>{
+  if(s.includes("claim_post"))return {rows:[{id:"12"}]};
+  if(s.includes("squad_listings"))return {rows:[listing]};
+  if(s.includes("fail_post")){failCalls++;return {rows:[{ok:false}]};}
+  throw Error("Unexpected SQL");
+ };
+ await assert.rejects(create(query,async()=>{
+  sends++;throw Error("ambiguous Discord timeout");
+ }).runOnce(),/Post quarantine not committed; manual reconciliation required/);
+ assert.equal(sends,1,"never resend an ambiguous Discord delivery");
+ assert.equal(failCalls,1,"never retry the safety-state transition speculatively");
+});
+test("missing listing only reports unsent after the private outbox confirms its state change",async()=>{
+ let sends=0;
+ const query=async(s,p)=>{
+  if(s.includes("claim_post"))return {rows:[{id:"12"}]};
+  if(s.includes("squad_listings"))return {rows:[]};
+  if(s.includes("fail_post")){
+   assert.equal(p[2],true,"only definitively unsent when no listing was sent");
+   return {rows:[{ok:true}]};
+  }
+  throw Error("Unexpected SQL");
+ };
+ const result=await create(query,async()=>{sends++;}).runOnce();
+ assert.equal(result.status,"unsent");
+ assert.equal(sends,0);
+});
+test("missing listing with false safety write never returns unsent or uncertain success",async()=>{
+ let sends=0,failCalls=0;
+ const query=async s=>{
+  if(s.includes("claim_post"))return {rows:[{id:"12"}]};
+  if(s.includes("squad_listings"))return {rows:[]};
+  if(s.includes("fail_post")){failCalls++;return {rows:[{ok:false}]};}
+  throw Error("Unexpected SQL");
+ };
+ await assert.rejects(create(query,async()=>{sends++;}).runOnce(),
+  /Unsent state not committed; manual reconciliation required/);
+ assert.equal(sends,0);
+ assert.equal(failCalls,1);
+});
