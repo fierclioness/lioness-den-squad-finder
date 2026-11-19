@@ -178,3 +178,58 @@ test("body deadline configuration is bounded and normal signed PING still succee
  assert.equal(res.status,200);
  assert.deepEqual(await res.json(),{type:1});
 });
+
+test("body deadline is cumulative across slow-but-continuing chunks",async()=>{
+ let claims=0,dispatches=0,cancelled=false;
+ const handle=fixture({enabled:true,bodyReadTimeoutMs:120,
+  claimReplay:async()=>{claims++;return true;},
+  dispatch:async()=>{dispatches++;return {content:"unexpected"};}
+ });
+ // Each 70ms interval is individually shorter than the 120ms limit.
+ // Resetting the timer on each chunk would allow all chunks and produce 401
+ // from the deliberately invalid signature, instead of the required 408.
+ let timers=[];
+ const stream=new ReadableStream({
+  start(controller){
+   controller.enqueue(new Uint8Array([123]));
+   timers=[
+    setTimeout(()=>controller.enqueue(new Uint8Array([32])),70),
+    setTimeout(()=>controller.enqueue(new Uint8Array([32])),140),
+    setTimeout(()=>controller.close(),210)
+   ];
+  },
+  cancel(){cancelled=true;for(const timer of timers)clearTimeout(timer);}
+ });
+ const res=await handle(new Request("https://example.invalid/functions/v1/den-matchmaker",{
+  method:"POST",duplex:"half",
+  headers:{"x-signature-ed25519":"00".repeat(64),"x-signature-timestamp":ts},
+  body:stream
+ }));
+ assert.equal(res.status,408,"Total read deadline must not restart after each chunk");
+ assert.equal(claims,0);
+ assert.equal(dispatches,0);
+ assert.equal(cancelled,true);
+});
+
+test("stream transport failure and malformed Content-Length fail before replay",async()=>{
+ let claims=0;
+ const handle=fixture({claimReplay:async()=>{claims++;return true;}});
+ const failed=new ReadableStream({
+  start(controller){controller.error(new Error("transport reset"));}
+ });
+ const broken=await handle(new Request("https://example.invalid",{
+  method:"POST",duplex:"half",body:failed,
+  headers:{"x-signature-ed25519":"00".repeat(64),"x-signature-timestamp":ts}
+ }));
+ assert.equal(broken.status,401);
+ for(const length of ["-1","not-a-number","1048577"]){
+  const res=await handle(new Request("https://example.invalid",{
+   method:"POST",body:"{}",headers:{
+    "content-length":length,"x-signature-ed25519":"00".repeat(64),
+    "x-signature-timestamp":ts
+   }
+  }));
+  assert.equal(res.status,413);
+ }
+ assert.equal(claims,0);
+});
