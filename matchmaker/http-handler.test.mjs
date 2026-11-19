@@ -21,6 +21,7 @@ const guild_id="1546529497925296199",member={user:{id:"1418199180287148073"}};
 function fixture(overrides={}){
  const replay=new Set();
  return makeMatchmakerHttpHandler({publicKeyHex:hex,clock:()=>now,
+  allowedTesterIds:new Set(["1418199180287148073"]),
   claimReplay:async id=>{if(replay.has(id))return false;replay.add(id);return true;},...overrides});
 }
 test("only signed PING accepted; disabled endpoint makes no public post",async()=>{
@@ -101,6 +102,13 @@ test("preview buttons bind publishing consent to the exact button identifiers",a
  }
 });
 
+test("enabled commands cannot accidentally authorize the whole guild",()=>{
+ assert.throws(()=>fixture({enabled:true,allowedTesterIds:null}),/nonempty tester allowlist/);
+ assert.throws(()=>fixture({enabled:true,allowedTesterIds:new Set()}),/nonempty tester allowlist/);
+ assert.throws(()=>fixture({enabled:"true"}),/feature gate/);
+ // Explicitly disabled signed PING remains available before a tester list is configured.
+ assert.doesNotThrow(()=>fixture({enabled:false,allowedTesterIds:null}));
+});
 test("restricted staging test allowlist rejects other members before dispatch",async()=>{
  let calls=0;
  const handle=fixture({enabled:true,allowedTesterIds:new Set(["1418199180287148073"]),dispatch:async()=>{calls++;return {content:"ok"};}});
