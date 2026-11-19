@@ -44,11 +44,16 @@ export function makeScheduledWorkerGateway({
    return respond(401,{error:"Unauthorized"});
   // There is no user data to accept. Refuse even a small JSON payload.
   if(request.body!==null)return respond(400,{error:"Request body not allowed"});
+  // Only explicit scheduler routes may dispatch a worker. Matching just the
+  // last URL segment would also run tasks from unexpected proxy/other paths.
+  // Support local /run, canonical Supabase Edge URLs, and Supabase's rewritten path.
   let taskName;
-  try{taskName=new URL(request.url).pathname.split("/").filter(Boolean).at(-1);}
-  catch{return respond(404,{error:"Not found"});}
+  try{
+   const path=new URL(request.url).pathname;
+   taskName=/^(?:\\/run|\\/den-matchmaker-worker|\\/functions\\/v1\\/den-matchmaker-worker)\\/(publish|cleanup|maintenance)$/.exec(path)?.[1];
+  }catch{return respond(404,{error:"Not found"});}
+  if(!taskName)return respond(404,{error:"Not found"});
   const task=tasks[taskName];
-  if(!task)return respond(404,{error:"Not found"});
   if(!task.allow)return respond(403,{error:"Task disabled"});
   try{
    const outcome=await task.runner.runOnce();
