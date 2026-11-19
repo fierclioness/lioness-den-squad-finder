@@ -46,7 +46,9 @@ try {
  const confirm=body.data.components[0].components[0].custom_id;
  const forged=await (await handle(signed(click(stranger,confirm)))).json();
  assert.match(forged.data.content,/could not complete/i);
- assert.match((await (await handle(signed(click(member,confirm)))).json()).data.content,/Nothing was posted/);
+ assert.match((await (await handle(signed(click(member,confirm)))).json()).data.content,/Nothing was posted or queued/);
+ const ownerQueue=(await client.query("select count(*)::int as n from matchmaker_internal.post_outbox o join matchmaker_internal.squad_listings s on o.listing_id=s.id where s.owner_discord_id=$1",[member.user.id])).rows[0];
+ assert.equal(ownerQueue.n,0,"Signed private confirmation must not enqueue a future public post");
  assert.match((await (await handle(signed(click(member,confirm)))).json()).data.content,/could not complete/i);
  body=await (await handle(signed(cmd(member,"mine")))).json();
  assert.match(body.data.content,/Call of Duty/);
