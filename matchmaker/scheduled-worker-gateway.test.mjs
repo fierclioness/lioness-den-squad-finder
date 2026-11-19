@@ -76,3 +76,35 @@ test("enabled routes reject disabled or wrong-task outcomes instead of false suc
   assert.deepEqual(await result.json(),{error:"Worker unavailable"});
  }
 });
+
+test("scheduler executes only exact trusted paths, never a matching last segment",async()=>{
+ let calls=0;
+ const handler=makeScheduledWorkerGateway({
+  enabled:true,schedulerSecret:secret,maintenanceEnabled:true,
+  maintenance:{runOnce:async()=>{calls++;return {status:"complete"};}}
+ });
+ for(const path of [
+  "/not-the-scheduler/maintenance",
+  "/functions/v1/another-service/maintenance",
+  "/run/maintenance/extra",
+  "/run/maintenance/",
+  "/run/%6daintenance",
+  "/maintenance",
+  "/run/constructor",
+  "/run/cleanup/../maintenance"
+ ]){
+  const response=await handler(request(path));
+  assert.equal(response.status,404,path);
+ }
+ assert.equal(calls,0,"unexpected paths must never execute private SQL");
+ for(const path of [
+  "/run/maintenance",
+  "/den-matchmaker-worker/maintenance",
+  "/functions/v1/den-matchmaker-worker/maintenance"
+ ]){
+  const response=await handler(request(path));
+  assert.equal(response.status,200,path);
+  assert.deepEqual(await response.json(),{task:"maintenance",status:"complete"});
+ }
+ assert.equal(calls,3);
+});
