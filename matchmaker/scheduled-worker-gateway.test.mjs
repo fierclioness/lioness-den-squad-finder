@@ -31,9 +31,10 @@ test("only a long scheduler key can access a separately enabled task",async()=>{
  assert.equal(publishCalls,0);
  const accepted=await handler(request("/run/cleanup"));
  assert.equal(accepted.status,200);
- assert.deepEqual(await accepted.json(),{task:"cleanup",status:"deleted"});
+ const raw=await accepted.text();
+ assert.deepEqual(JSON.parse(raw),{task:"cleanup",status:"deleted"});
  assert.equal(cleanupCalls,1);
- assert.doesNotMatch(await accepted.clone().text(),/should-never-leak|secret/);
+ assert.doesNotMatch(raw,/should-never-leak|secret/);
 });
 test("fail closed on malformed task, wrong method and any request body",async()=>{
  const handler=makeScheduledWorkerGateway({enabled:true,schedulerSecret:secret,
