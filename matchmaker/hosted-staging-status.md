@@ -60,19 +60,28 @@ Supabase staging security advisor reports INFO `rls_enabled_no_policy` on seven 
 - A 401 unsigned test **does not** prove a valid Discord signature, replay-claim database write, or response latency for a signed request. No bot token, Discord endpoint URL, public message or production setting was changed.
 - **Important:** The Discord application visible to the user is currently described as the Den Missions bot. Do **not** set or replace its Interactions Endpoint URL until we confirm the existing bot's command handling; changing it could interrupt Den Missions. Prefer a **separate Discord testing application** with its own public key for the staged signed-PING test, then update staging's public key securely. Any real Discord configuration needs separate approval.
 
-## What is not yet verified
+## November 19 live signed verification, runtime timing, and replay safety
 
-- Actual HTTP invocation status/latency from a live client. External connectivity from the assistant environment could not reach the URL; Edge Function `ACTIVE` confirms deployment metadata, **not successful runtime invocation**.
-- Real private database connectivity from Edge: `DEN_MATCHMAKER_DATABASE_URL` and `DEN_MATCHMAKER_DISCORD_PUBLIC_KEY` are not set via the connector. The user must **not paste credentials into chat or GitHub**. Provision through secure Supabase Edge Function secrets when ready.
-- Real signed Discord interaction signature using the authorized Discord application's public key.
-- Hosted worker scheduling, posting and cleanup under authenticated bot credentials; Discord 3-second acknowledgement performance.
-- Discord guild-only command registration, controlled test-account E2E, operational monitoring and release rollback.
+- **Separate Discord app:** user created `Den Matchmaker Test`, replaced the staging `DEN_MATCHMAKER_DISCORD_PUBLIC_KEY` with that app's public key, and saved the isolated staging interaction URL. It has **0 installed servers**, so there were no member-facing commands, posts or DM events.
+- **Real Discord signature handshake:** Supabase `function_edge_logs` recorded Discord user-agent POST **401** for Discord's deliberate invalid-signature check, followed by **200** for the genuine signed PING on **2026-11-19 00:41:13 UTC**. The successful signed request inserted **one** private replay claim via the actual deployed Edge-to-PostgreSQL connection. The private ledger had exactly 1 row afterward, with **zero** listings/post jobs/cleanup jobs.
+- **Observed gateway execution time:** signed PING **73 ms** and deliberately bad-signature probe **247 ms** (2 samples). This is **Supabase Edge execution time**, not network-wide latency or a p95 for real commands. The saved Discord endpoint demonstrates the handshake met Discord's validation criteria; separate load/command response timing remains necessary.
+- **Database replay idempotency:** on isolated staging, a synthetic interaction claim returned true once and false on duplicate inside an explicit **rolled-back SQL transaction**. Verified ledger remained 1 row and no listings/posts were added.
+- **Safe hosted negative checks:** staging-only GitHub Actions run **#44432676708 PASSED** health GET 200, unsigned POST 401, and forged signed-looking POST 401. This test does not need a Discord secret, does not send genuine signed requests, and therefore cannot add replay claims.
+- **Cleanup hardening in review branch:** corrected the older message deletion transport so it delegates to bot-authorship verification (GET exact original message from fixed channel and verify message ID, bot author and bot flag) before DELETE. JS and Postgres CI must pass before this can be considered a tested change; no live Discord API requests have been sent.
+
+## What is NOT yet verified / release-blocking
+
+- Guild-scoped `/squad` registration and authorized real Discord member test (the test app is deliberately **not installed**). Staging command flag is still OFF.
+- Real end-to-end command interaction with Edge-to-DB and initial response under Discord's three-second deadline, including delayed connection and failure scenarios. A single PING's 73 ms Edge time is **not** sufficient evidence.
+- A protected Discord sender and cleanup worker, scheduler permission boundaries, uncertain-delivery reconciliation, and original bot-owned post lifecycle in a controlled channel. These have extensive offline/disposable PostgreSQL tests but **no real Discord posting test**.
+- Least-privilege production service role, private schema migration review and rollback, explicit owner-controlled launch gate.
+- Do NOT merge PR #2, enable guild commands, deploy to Den Missions production, or publish/delete member-facing messages without explicit separate approval. Keep existing Squad Finder running.
 
 ## Next controlled rollout steps
 
-1. Set the staging function's two required secret variables through Supabase dashboard or an authorized secure secrets workflow: `DEN_MATCHMAKER_DATABASE_URL` (staging-only private TLS DB connection string) and `DEN_MATCHMAKER_DISCORD_PUBLIC_KEY` (Discord app public signing key). Keep `DEN_MATCHMAKER_COMMANDS_ENABLED=false`.
-2. Using an isolated Discord test application, verify signed PING requests and replay rejection against staging, without posting public messages. Confirm actual response-time budget and database connectivity.
-3. Run the private outbox and cleanup worker on a properly authenticated scheduler, with real channel/bot provenance, no auto-retry of uncertain deliveries and a separate approval gate for public posting.
-4. Never use the Den Missions production project as the staging DB. Leave the existing manual Squad Finder live. Do not merge the draft GitHub PR or register real commands until authorized.
+1. Keep the test Discord app and original Den Missions bot separate. Continue authenticated and negative tests in isolated staging.
+2. Finish reviewed, bot-ownership-verified sending and cleanup worker with fail-closed no-retry-on-uncertainty rules; verify CI and launch rollback.
+3. After a new explicit owner authorization to install the test app, register **test-only** guild `/squad` commands with posting OFF; perform controlled secondary-account tests.
+4. Require separate approval for publishing, private schema production migration, and production release. Preserve manual Squad Finder fallback.
 
-**This status file documents genuine hosted staging progress; it is not a production launch approval.**
+**This is a staging verification record, not launch authorization.**
