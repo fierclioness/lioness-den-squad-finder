@@ -7,17 +7,29 @@ import {makeDiscordVerifier} from "./discord-webcrypto-verifier.mjs";
 const GUILD="1546529497925296199";
 const SNOWFLAKE=/^\d{15,22}$/;
 const MAX_BODY=1024*1024;
+const DEFAULT_BODY_READ_TIMEOUT_MS=1500; // leave headroom for Discord signature + DB work
 class BodyTooLarge extends Error {}
+class BodyReadTimeout extends Error {}
 // Limit streamed bodies *before* allocating/validating Ed25519 data. A hostile
 // request can omit Content-Length or lie about it; arrayBuffer() is unbounded.
-async function readLimitedBody(request){
+async function readLimitedBody(request,timeoutMs){
  const reader=request.body?.getReader();
  if(!reader)return new Uint8Array(0);
+ // A small body can still stall forever between chunks. Set ONE deadline for
+ // the entire pre-authentication read, not a fresh deadline per chunk.
+ // This is safe to time out: no signature verification or DB write has begun.
+ const deadline=AbortSignal.timeout(timeoutMs);
+ let detachTimeout;
+ const timeout=new Promise((_,reject)=>{
+  const listener=()=>reject(new BodyReadTimeout("Discord payload read deadline exceeded"));
+  deadline.addEventListener("abort",listener,{once:true});
+  detachTimeout=()=>deadline.removeEventListener("abort",listener);
+ });
  let total=0;
  const parts=[];
  try{
   for(;;){
-   const {done,value}=await reader.read();
+   const {done,value}=await Promise.race([reader.read(),timeout]);
    if(done)break;
    if(!(value instanceof Uint8Array))throw Error("Invalid request bytes");
    total+=value.byteLength;
@@ -28,7 +40,7 @@ async function readLimitedBody(request){
   // Cancel excess streaming input; never reach signing or replay storage.
   void reader.cancel().catch(()=>{});
   throw error;
- }finally{reader.releaseLock();}
+ }finally{detachTimeout();reader.releaseLock();}
  const bytes=new Uint8Array(total);
  let offset=0;
  for(const part of parts){bytes.set(part,offset);offset+=part.byteLength;}
@@ -37,8 +49,10 @@ async function readLimitedBody(request){
 const JSON_HEADERS={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
 const ephemeral=content=>({type:4,data:{flags:64,content,allowed_mentions:{parse:[]}}});
-export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,allowedTesterIds=null,clock=()=>Date.now()}){
+export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,enabled=false,allowedTesterIds=null,clock=()=>Date.now(),bodyReadTimeoutMs=DEFAULT_BODY_READ_TIMEOUT_MS}){
  if(typeof enabled!=="boolean")throw Error("Invalid command feature gate");
+ if(!Number.isInteger(bodyReadTimeoutMs)||bodyReadTimeoutMs<25||bodyReadTimeoutMs>2000)
+  throw Error("Invalid Discord body read timeout");
  if(allowedTesterIds!==null && (!(allowedTesterIds instanceof Set)||[...allowedTesterIds].some(id=>typeof id!=="string"||!SNOWFLAKE.test(id))))
   throw Error("Invalid tester allowlist");
  // Freeze authorization at construction time. A caller mutating the Set later
@@ -59,9 +73,11 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   if(declaredLength!==null && (!/^\d+$/.test(declaredLength)||Number(declaredLength)>MAX_BODY))
    return json({error:"Payload too large"},413);
   let bytes,interaction;
-  try{bytes=await readLimitedBody(request);}
+  try{bytes=await readLimitedBody(request,bodyReadTimeoutMs);}
   catch(error){return error instanceof BodyTooLarge
-    ? json({error:"Payload too large"},413):json({error:"Unauthorized"},401);}
+    ? json({error:"Payload too large"},413)
+    : error instanceof BodyReadTimeout ? json({error:"Request timeout"},408)
+    : json({error:"Unauthorized"},401);}
   try{interaction=await verifier.authenticate({rawBody:bytes,timestamp,signature});}
   catch{return json({error:"Unauthorized"},401);}
   if(interaction.type===1)return json({type:1}); // Signed PING only.
