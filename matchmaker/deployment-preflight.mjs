@@ -1,5 +1,6 @@
 // Read-only deployment preflight: never connects, deploys or prints secrets.
 // 'readyForControlledTest' is NOT permission to enable a bot or migrate production.
+import {pointsAtWrongSupabaseProject} from "./staging-runtime-config.mjs";
 const SNOW=/^\d{15,22}$/;
 const KEY=/^[a-f0-9]{64}$/i;
 export function auditMatchmakerConfig(config) {
@@ -17,6 +18,11 @@ export function auditMatchmakerConfig(config) {
     let url;
     try{url=new URL(config.databaseUrl);}catch{errors.push("Database URL is malformed");}
     if(url){
+      // Share the runtime staging-isolation guard with the human-facing launch
+      // checklist: syntactically valid Den Missions/cross-project DB URLs must
+      // never produce a green read-only Matchmaker deployment preflight.
+      if(pointsAtWrongSupabaseProject(config.databaseUrl))
+        errors.push("Database URL is outside approved isolated Matchmaker staging routing");
       if(url.username===""||url.password==="")errors.push("Database credentials are missing");
       // pg-connection-string query parameters can shadow URL authority values,
       // e.g. ?host=other-project overrides the reviewed hostname. Never clear
