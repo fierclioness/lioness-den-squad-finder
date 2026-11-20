@@ -47,7 +47,13 @@ export function auditMatchmakerConfig(config) {
   }
   if(config.guildId!=="1546529497925296199")errors.push("Unexpected Discord guild");
   if(publish){
-    if(!SNOW.test(String(config.channelId||"")))errors.push("Discord destination channel ID required");
+    // Discord snowflakes are exact identifiers, not JavaScript numbers. The
+    // preview checklist must enforce the same trusted identities as the live
+    // publish and original-bot cleanup workers; do not coerce numeric IDs.
+    if(typeof config.channelId!=="string"||!SNOW.test(config.channelId))
+      errors.push("Exact-string Discord destination channel ID required");
+    if(typeof config.botUserId!=="string"||!SNOW.test(config.botUserId))
+      errors.push("Exact-string original bot user ID required for verified cleanup");
     if(config.channelId===config.guildId)errors.push("Destination channel has not been independently identified");
     if(typeof config.botToken!=="string"||config.botToken.length<20)
       errors.push("Server-only Discord bot token required");
