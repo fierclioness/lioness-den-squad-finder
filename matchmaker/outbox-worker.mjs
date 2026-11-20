@@ -1,8 +1,10 @@
 // Review-only one-item Matchmaker publisher. NO built-in network API or bot token.
 // Production requires a trusted, injected Discord transport and audited feature gate.
 // Ambiguous delivery is quarantined, never automatically retried.
+// All Discord snowflakes must be primitive strings: do not round numeric receipts.
 import {markerFor} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
+const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 class UnconfirmedOutboxState extends Error {}
 function row(result){
@@ -30,7 +32,7 @@ export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=
  if(typeof query!=="function")throw Error("Trusted database query required");
  if(typeof sendMessage!=="function")throw Error("Trusted Discord transport required");
  if(typeof enabled!=="boolean")throw Error("Invalid publish flag");
- if(enabled && (!SNOW.test(String(channelId||""))||!SNOW.test(String(botUserId||""))))
+ if(enabled && (!exactSnow(channelId)||!exactSnow(botUserId)))
   throw Error("Trusted configured channel and bot identity required");
  async function call(sql,params){return row(await query(sql,params));}
  async function runOnce(){
@@ -57,16 +59,16 @@ export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=
    // sendMessage MUST use an audited destination, allow_mentions parse [], and
    // classify uncertain network failures conservatively.
    const sent=await sendMessage({content,allowed_mentions:{parse:[]}});
-   if(!sent||sent.confirmed!==true||!SNOW.test(String(sent.messageId||""))||
+   if(!sent||sent.confirmed!==true||!exactSnow(sent.messageId)||
       sent.channelId!==channelId || sent.botUserId!==botUserId)
     throw Error("Discord delivery could not be confirmed");
    confirmed=true;
    const done=await call(
     "select matchmaker_internal.finish_post_with_receipt($1::bigint,$2::uuid,$3::text,$4::text,$5::text) as result",
-    [listingId,workerId,String(sent.messageId),channelId,botUserId]);
+    [listingId,workerId,sent.messageId,channelId,botUserId]);
    if(!["posted_active","posted_cleanup_queued"].includes(done?.result))
     throw Error("Could not record trusted Discord receipt");
-   return {status:done.result==="posted_active"?"posted":"posted_cleanup_queued",listingId,messageId:String(sent.messageId)};
+   return {status:done.result==="posted_active"?"posted":"posted_cleanup_queued",listingId,messageId:sent.messageId};
   }catch(error){
     // A false/absent database safety acknowledgement must never be reported as
     // successful quarantine. Do not attempt a second state transition here.
