@@ -103,3 +103,54 @@ test("private confirmation cannot be retroactively posted when worker starts",as
  assert.match(seen.at(-1),/confirm_and_enqueue/);
  assert.throws(()=>makePostgresMatchmakerStore({query,publishingEnabled:"true"}),/flag/);
 });
+
+test("private preview RPC refuses coerced tokens before they reach Discord consent buttons",async()=>{
+ let sqlCalls=0;
+ let databaseToken=token;
+ const store=makePostgresMatchmakerStore({
+  query:async sql=>{
+   sqlCalls++;
+   assert.match(sql,/prepare_preview/);
+   return {rows:[{token:databaseToken}]};
+  }
+ });
+ // The dispatcher must never be given a string-converted token by storage.
+ for(const untrusted of [
+  new String(token),{toString:()=>token},[token],null,undefined,
+  11111111,11111111n,"not-a-uuid"
+ ]){
+  databaseToken=untrusted;
+  await assert.rejects(store.prepare(actor,draft),/valid preview token/);
+ }
+ assert.equal(sqlCalls,8,"Each failed preview may query once, but cannot issue a trusted token");
+ databaseToken=token;
+ assert.deepEqual(await store.prepare(actor,draft),{token});
+ assert.equal(sqlCalls,9);
+});
+
+test("private confirmation RPC rejects rounded or coerced PostgreSQL listing IDs",async()=>{
+ let resultId="9007199254740993";
+ let sqlCalls=0;
+ const store=makePostgresMatchmakerStore({
+  query:async sql=>{
+   sqlCalls++;
+   assert.match(sql,/confirm_preview/);
+   return {rows:[{id:resultId}]};
+  }
+ });
+ // The long valid ID has a different value if cast to Number.
+ assert.notEqual(String(Number(resultId)),resultId);
+ for(const untrusted of [
+  Number(resultId),BigInt(resultId),new String(resultId),
+  {toString:()=>resultId},[resultId],null,undefined,
+  "09007199254740993","0","-5","9223372036854775808"
+ ]){
+  resultId=untrusted;
+  await assert.rejects(store.confirm(actor,token),/valid listing ID/);
+ }
+ assert.equal(sqlCalls,11);
+ resultId="9007199254740993";
+ assert.deepEqual(await store.confirm(actor,token),
+  {listingId:resultId,publicPostCreated:false,queuedForPublishing:false});
+ assert.equal(sqlCalls,12);
+});
