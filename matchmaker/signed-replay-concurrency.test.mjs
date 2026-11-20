@@ -116,15 +116,16 @@ test("concurrent differently signed commands reusing one interaction ID cannot b
 test("delayed durable replay claim is never skipped to meet a latency budget",async()=>{
  let releaseClaim;
  let dispatches=0;
- let started=0;
+ let enteredClaim;
+ const claimantEntered=new Promise(resolve=>{enteredClaim=resolve;});
  const handle=handler({
-  claimReplay:()=>new Promise(resolve=>{releaseClaim=resolve;}),
+  claimReplay:()=>new Promise(resolve=>{releaseClaim=resolve;enteredClaim();}),
   dispatch:async()=>{dispatches++;return {content:"test-only authorized response"};}
  });
  const pending=handle(signedRequest(command("1546529501859815442")));
  // The authenticated callback must NOT acknowledge or dispatch until the
  // durable replay claimant has returned, even if doing so adds latency.
- await new Promise(resolve=>setImmediate(resolve));
+ await claimantEntered;
  assert.equal(typeof releaseClaim,"function");
  assert.equal(dispatches,0);
  releaseClaim(true);
