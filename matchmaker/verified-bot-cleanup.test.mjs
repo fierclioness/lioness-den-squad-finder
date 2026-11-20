@@ -42,7 +42,7 @@ test("unverified response and unavailable Discord fail closed",async()=>{
  });
  await assert.rejects(x.remove(messageId),/not verified/);
  assert.equal(deletes,0);
- const missing=create(async()=>({status:404}));
+ const missing=create(async()=>({status:404,json:async()=>({code:10008,message:"Unknown Message"})}));
  assert.equal((await missing.remove(messageId)).status,"already_absent");
  const unauthorized=create(async()=>({status:403}));
  await assert.rejects(unauthorized.remove(messageId),/Could not verify/);
@@ -123,4 +123,50 @@ test("numeric Discord snowflakes never authorize bot-message deletion",async()=>
   assert.equal(gets,1);
   assert.equal(deletes,0,"Numeric author, channel or message IDs cannot authorize DELETE");
  }
+});
+
+test("GET 404 requires exact Discord Unknown Message code before declaring cleanup complete",async()=>{
+ for(const reply of [
+  {status:404,json:async()=>({code:10003,message:"Unknown Channel"})},
+  {status:404,json:async()=>({code:"10008",message:"Unknown Message"})},
+  {status:404,json:async()=>({code:12345,message:"Proxy not found"})},
+  {status:404,json:async()=>{throw Error("Non-JSON proxy response")}},
+  {status:404}
+ ]){
+  const methods=[];
+  const transport=create(async(_url,init)=>{methods.push(init.method);return reply;});
+  await assert.rejects(transport.remove(messageId),/Unverified Discord not-found response/);
+  assert.deepEqual(methods,["GET"],"Never DELETE when 404 could be a missing channel or proxy error");
+ }
+ const methods=[];
+ const safelyAbsent=create(async(_url,init)=>{
+  methods.push(init.method);
+  return {status:404,json:async()=>({code:10008,message:"Unknown Message"})};
+ });
+ assert.deepEqual(await safelyAbsent.remove(messageId),{status:"already_absent"});
+ assert.deepEqual(methods,["GET"]);
+});
+
+test("DELETE 404 may finish only on Discord Unknown Message; other 404s need reconciliation",async()=>{
+ for(const reply of [
+  {status:404,json:async()=>({code:10003,message:"Unknown Channel"})},
+  {status:404,json:async()=>({code:"10008",message:"Unknown Message"})},
+  {status:404,json:async()=>{throw Error("Untrusted gateway response")}}
+ ]){
+  const methods=[];
+  const transport=create(async(_url,init)=>{
+   methods.push(init.method);
+   return init.method==="GET"?{status:200,json:async()=>good()}:reply;
+  });
+  await assert.rejects(transport.remove(messageId),/Message deletion not confirmed/);
+  assert.deepEqual(methods,["GET","DELETE"],"Ambiguous deletion is never retried");
+ }
+ const methods=[];
+ const safelyAbsent=create(async(_url,init)=>{
+  methods.push(init.method);
+  return init.method==="GET"?{status:200,json:async()=>good()}:
+   {status:404,json:async()=>({code:10008,message:"Unknown Message"})};
+ });
+ assert.deepEqual(await safelyAbsent.remove(messageId),{status:"already_absent"});
+ assert.deepEqual(methods,["GET","DELETE"]);
 });
