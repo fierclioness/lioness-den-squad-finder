@@ -4,6 +4,7 @@
 // message/author verification before DELETE). Never trust listing/user input.
 class UnconfirmedCleanupState extends Error {}
 const SNOW=/^\d{15,22}$/;
+const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const one = result => {
  if(!result || !Array.isArray(result.rows)) throw Error("Invalid trusted DB result");
@@ -16,7 +17,7 @@ export function makeCleanupOutboxWorker({
  if(typeof query!=="function"||typeof verifiedCleanup?.remove!=="function"||
     typeof newWorkerId!=="function"||typeof clock!=="function"||typeof enabled!=="boolean")
   throw Error("Trusted private cleanup connector, clock, and feature gate required");
- if(enabled && (!SNOW.test(String(channelId||""))||!SNOW.test(String(botUserId||""))))
+ if(enabled && (!exactSnow(channelId)||!exactSnow(botUserId)))
   throw Error("Trusted fixed Discord channel and original bot identity required");
  const call=async(sql,params)=>one(await query(sql,params));
  const finish=async(listingId,workerId,confirmed)=>{
@@ -59,7 +60,7 @@ export function makeCleanupOutboxWorker({
      Date.parse(String(rec.expires_at))<=clock();
    const inactive=rec?.listing_status==="closed"||rec?.listing_status==="expired"||expired;
    const safe=rec&&String(rec.listing_id)===listingId&&inactive &&
-     SNOW.test(String(rec.message_id||"")) &&
+     exactSnow(rec.message_id) &&
      rec.message_id===rec.receipt_message_id &&
      rec.channel_id===channelId && rec.receipt_channel_id===channelId &&
      rec.bot_user_id===botUserId && rec.receipt_bot_user_id===botUserId;
