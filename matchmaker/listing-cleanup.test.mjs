@@ -63,3 +63,40 @@ test("only verified absence is terminal; Discord API errors remain unresolved",a
    {status:200,json:async()=>receipt()}:{status:429}});
  await assert.rejects(failedDeletion.removeConfirmedBotPost(planCleanup(row,{now:2000})),/reconciliation/);
 });
+
+// A JavaScript Number cannot safely represent a 19-digit Discord snowflake.
+// A legacy cleanup plan must not promote an imprecise/coerced identity to a
+// DELETE candidate, even if the eventual message happens to be bot-owned.
+test("legacy cleanup refuses coerced Discord IDs before any HTTP deletion",async()=>{
+ const invalid=(value)=>[Number(value),BigInt(value),new String(value),
+   {toString:()=>value},[value]];
+ const tCalls=[];
+ const transport=makeMessageCleanupTransport({enabled:true,botToken:token,
+  botUserId,channelId:channel,fetchFn:async(...args)=>{
+   tCalls.push(args);throw Error("Must never contact Discord");
+  }});
+ for(const bad of invalid(id)){
+  const planned=planCleanup({...row,messageId:bad},{now:2000});
+  assert.equal(planned.action,"manual","Ambiguous message ID must not be deletable");
+  await assert.rejects(transport.removeConfirmedBotPost({action:"delete",
+   channelId:channel,messageId:bad}),/Unverified/);
+ }
+ for(const bad of invalid(channel)){
+  assert.equal(planCleanup({...row,channelId:bad},{now:2000}).action,"manual");
+  await assert.rejects(transport.removeConfirmedBotPost({action:"delete",
+   channelId:bad,messageId:id}),/Unverified/);
+ }
+ assert.equal(tCalls.length,0,"No GET or DELETE may occur for invalid IDs");
+ assert.equal(planCleanup(row,{now:2000}).action,"delete","Valid primitive IDs still work");
+});
+
+test("legacy enabled cleanup rejects coerced fixed channel and original-bot identities",()=>{
+ for(const bad of [Number(channel),BigInt(channel),new String(channel),{toString:()=>channel}]){
+  assert.throws(()=>makeMessageCleanupTransport({enabled:true,botToken:token,
+   botUserId,channelId:bad}),/identity/);
+ }
+ for(const bad of [Number(botUserId),BigInt(botUserId),new String(botUserId),{toString:()=>botUserId}]){
+  assert.throws(()=>makeMessageCleanupTransport({enabled:true,botToken:token,
+   botUserId:bad,channelId:channel}),/identity/);
+ }
+});
