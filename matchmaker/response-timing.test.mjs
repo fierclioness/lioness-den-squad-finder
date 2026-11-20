@@ -135,3 +135,29 @@ test("launch latency summary rejects a disabled or unrealistic local budget",()=
  }
  assert.equal(evaluateTimingSamples([20,40,50],{budgetMs:100}).withinLocalBudget,true);
 });
+
+test("p95 alone cannot certify 2-second local headroom when a slow ACK is hidden",()=>{
+ // With 20 requests, 19 fast ACKs hide the lone 2,450ms response at p95.
+ // All ACKs are under Discord's 3s deadline, but not all preserve headroom.
+ const samples=[...Array(19).fill(120),2450];
+ const result=evaluateTimingSamples(samples);
+ assert.equal(result.count,20);
+ assert.equal(result.p95Ms,120);
+ assert.equal(result.maxMs,2450);
+ assert.equal(result.p95WithinLocalBudget,true);
+ assert.equal(result.allWithinDiscordDeadline,true);
+ assert.equal(result.withinLocalBudget,false,
+  "Do not green-light a local latency gate based on p95 and the 3s maximum alone");
+ // Exactly at the 2-second budget is not below it.
+ assert.equal(evaluateTimingSamples([20,2000]).withinLocalBudget,false);
+ const fast=evaluateTimingSamples([100,120,350]);
+ assert.equal(fast.withinLocalBudget,true);
+ assert.equal(fast.allWithinDiscordDeadline,true);
+});
+
+test("3-second deadline failures stay distinct from local headroom failures",()=>{
+ const tooSlow=evaluateTimingSamples([...Array(19).fill(100),3100]);
+ assert.equal(tooSlow.p95WithinLocalBudget,true);
+ assert.equal(tooSlow.allWithinDiscordDeadline,false);
+ assert.equal(tooSlow.withinLocalBudget,false);
+});
