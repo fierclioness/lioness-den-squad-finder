@@ -2,10 +2,12 @@
 // Server-side only. Nothing sends until a trusted caller explicitly invokes sendMessage.
 // The target is an APPROVED GUILD TEXT CHANNEL (e.g., existing #squad-up), not a DM.
 const SNOW=/^\d{15,22}$/;
+// Discord snowflakes exceed JS safe-integer precision: never coerce numbers.
+const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const API="https://discord.com/api/v10";
 export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch,enabled=false,requestTimeoutMs=5000}){
  if(typeof enabled!=="boolean")throw Error("Invalid publish feature gate");
- if(enabled && (typeof botToken!=="string"||botToken.length<20||!SNOW.test(String(channelId))||!SNOW.test(String(botUserId))))
+ if(enabled && (typeof botToken!=="string"||botToken.length<20||!exactSnow(channelId)||!exactSnow(botUserId)))
   throw Error("Verified server-side bot credentials and destination required");
  if(typeof fetchFn!=="function")throw Error("Trusted transport fetch required");
  if(!Number.isInteger(requestTimeoutMs)||requestTimeoutMs<10||requestTimeoutMs>15000)
@@ -34,8 +36,8 @@ export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch
   if(!response.ok)throw Error("Delivery not confirmed");
   let data;
   try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
-  if(!data || !SNOW.test(String(data.id||"")) || String(data.channel_id)!==String(channelId)||
-      String(data.author?.id)!==String(botUserId)||data.author?.bot!==true)
+  if(!data || !exactSnow(data.id) || data.channel_id!==channelId||
+      data.author?.id!==botUserId||data.author?.bot!==true)
    throw Error("Untrusted delivery receipt");
   return {confirmed:true,messageId:String(data.id),channelId:String(data.channel_id),botUserId:String(data.author.id)};
  }
