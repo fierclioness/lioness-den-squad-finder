@@ -1,3 +1,13 @@
+## Nov 20, 2026 UTC — operator recovery bigint boundary, no deploy (REVIEW ONLY)
+
+Draft PR #2 operator-assisted uncertain Discord delivery reconciliation now rejects rounded numeric, BigInt, boxed, object-coerced, noncanonical, negative and out-of-range PostgreSQL listing IDs. The outbox ID and persisted listing ID must be identical primitive canonical signed-int8 strings; `String(...)` coercion was removed. This closes a remaining route to misassociate a recovered Discord post after operator approval. One new adversarial regression covers both identities and valid 19-digit string IDs.
+
+**Green on code/test commit `0915578b`:** [187/187 Node PASS (log verified)](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44727587935), [Edge TypeScript and hosted read-only HTTP PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44727588029), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44727587933). Independent source readback confirms the fixed exact-string boundary. Isolated Supabase `tcxktyqywsqafnyxhpgy`: Edge v17 **ACTIVE**; SQL read-only counts: 0 listings, pending previews, post/cleanup jobs, receipts and reconciliation records; 1 earlier authentic signed PING replay. Seven INFO private RLS/no-policy findings (expected from restricted private tables).
+
+**NO deploy or runtime behavior change:** Commands, posting and scheduling OFF; PR DRAFT/unmerged. Den Missions production `cpjcjcxinhjusosaguyi`, Discord application/guild/member data, public messages and original manual Squad Finder untouched. Real authorized /squad client ACK under 3s, separately approved authenticated worker and controlled bot-only post/cleanup, independent security review and release remain blocked.
+
+---
+
 ## Nov 20, 2026 UTC — exact PostgreSQL bigint listing claim protection (DRAFT / REVIEW ONLY)
 
 Security review found that the guarded publisher and bot-only cleanup workers used `String(...)` on claimed PostgreSQL `bigint` listing IDs. If a database adapter ever returned an imprecise JavaScript Number, this could silently select a different persisted listing or send a cleanup to the wrong post. Both workers now accept only canonical primitive positive decimal strings within PostgreSQL signed-int8 range; cleanup additionally requires the receipt listing ID to match the claimed string **without coercion**. Malformed, rounded, BigInt, boxed, noncanonical and out-of-range claims abort before subsequent private SQL or Discord requests; malformed original cleanup receipt identities are quarantined without Discord DELETE.
