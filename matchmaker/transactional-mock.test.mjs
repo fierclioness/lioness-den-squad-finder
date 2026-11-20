@@ -47,3 +47,39 @@ test("parallel duplicate interaction ids accepted only once",async()=>{
  assert.equal(results.filter(Boolean).length,1);
  assert.equal(await app.acceptInteraction("1546529501859815438"),false);
 });
+
+test("offline actor access never accepts rounded or string-coercible member IDs",async()=>{
+ const app=makeTransactionalMock({clock:()=>1000000});
+ const preview=app.preview(member,draft);
+ await app.confirm(member,preview.token);
+ const original=app.mine(member);
+ assert.ok(original);
+ assert.notEqual(String(Number(member.memberId)),member.memberId);
+ for(const invalid of [
+  Number(member.memberId),BigInt(member.memberId),new String(member.memberId),
+  [member.memberId],{toString:()=>member.memberId},null,undefined
+ ]){
+  const actor={guildId:member.guildId,memberId:invalid};
+  assert.throws(()=>app.preview(actor,draft),/Invalid guild member/);
+  assert.throws(()=>app.mine(actor),/Invalid guild member/);
+  assert.throws(()=>app.list(actor),/Invalid guild member/);
+  await assert.rejects(app.confirm(actor,preview.token),/Invalid guild member/);
+  await assert.rejects(app.close(actor),/Invalid guild member/);
+ }
+ assert.equal(app.mine(member).listingId,original.listingId,
+  "Coerced identities cannot close, replace, or read another member's listing");
+ assert.equal(app.list(member).length,1);
+});
+
+test("offline replay ledger refuses imprecise and coerced interaction keys",async()=>{
+ const app=makeTransactionalMock();
+ const id="1546529501859815438";
+ assert.notEqual(String(Number(id)),id);
+ for(const invalid of [Number(id),BigInt(id),new String(id),[id],
+   {toString:()=>id},null,undefined]){
+  await assert.rejects(app.acceptInteraction(invalid),/Invalid interaction ID/);
+ }
+ assert.equal(await app.acceptInteraction(id),true,
+  "A rejected rounded ID must not consume a different exact replay key");
+ assert.equal(await app.acceptInteraction(id),false);
+});
