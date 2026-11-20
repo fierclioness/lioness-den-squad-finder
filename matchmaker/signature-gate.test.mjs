@@ -15,6 +15,17 @@ test("accepts correctly signed raw body, rejects replay",()=>{
  assert.equal(gate.authenticate(headers).type,1);
  assert.throws(()=>gate.authenticate(headers),/Replay/);
 });
+test("offline signed replay gate rejects numeric interaction IDs before claiming",()=>{
+ const gate=makeSignatureGate({publicKeyHex,clock:()=>now});
+ // An imprecise 19-digit JSON number must not become a different replay key.
+ for(const value of [1546529501859815438,123456789012345,null,{}]){
+  assert.throws(()=>gate.authenticate(signHeaders(body(value))),/Invalid interaction ID/);
+ }
+ const exact="1546529501859815438";
+ assert.equal(gate.authenticate(signHeaders(body(exact))).id,exact);
+ assert.throws(()=>gate.authenticate(signHeaders(body(exact))),/Replay/);
+});
+
 test("rejects forged, stale, and future requests",()=>{
  const gate=makeSignatureGate({publicKeyHex,clock:()=>now});
  const signed=signHeaders(body("1546529501859815438"));
