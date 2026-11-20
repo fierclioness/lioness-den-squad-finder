@@ -22,7 +22,7 @@ function listingToMessage(listing){
  const fields=["game","platform","vibe","mic","timezone","availability"];
  const out=fields.map(k=>{
   if(typeof listing[k]!=="string"||listing[k].length>80||
-     /(?:@everyone|@here|<@|https?:\/\/|discord\.gg)/i.test(listing[k]))
+     /(?:@everyone|@here|<@|<#|https?:\/\/|discord\.gg)/i.test(listing[k]))
    throw Error("Unsafe listing value");
   return listing[k].replace(/[\r\n]/g," ");
  });
