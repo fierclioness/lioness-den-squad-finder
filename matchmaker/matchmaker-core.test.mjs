@@ -42,3 +42,18 @@ test("consent-aware preview never suggests public chat for private-only drafts",
  assert.match(publicText,/may post this request in #squad-up/);
  assert.throws(()=>formatPreview(draft,{publishingEnabled:"true"}),/Invalid preview publishing mode/);
 });
+
+// Offline models must preserve exact Discord snowflakes, just like the signed
+// HTTP handler and the private PostgreSQL adapter. Number() can round 19-digit IDs.
+test("offline listing ownership never rounds numeric or object-coerced Discord IDs",()=>{
+ const rounded=String(Number(ownerId));
+ assert.notEqual(rounded,ownerId);
+ for(const invalid of [Number(ownerId),BigInt(ownerId),new String(ownerId),{toString:()=>ownerId},null,undefined]){
+  assert.throws(()=>createListing({ownerId:invalid,draft,nowMs:1000}),/Discord member/);
+ }
+ const listing=createListing({ownerId:rounded,draft,nowMs:1000});
+ for(const invalid of [Number(ownerId),BigInt(rounded),new String(rounded),{toString:()=>rounded},null,undefined]){
+  assert.throws(()=>closeListing(listing,invalid,1001),/owner/);
+ }
+ assert.equal(closeListing(listing,rounded,1001).status,"closed");
+});
