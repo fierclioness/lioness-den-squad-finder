@@ -26,3 +26,11 @@ jobs:
         with:
           node-version: '22'
       - run: node --test matchmaker/*.test.mjs
+  edge-worker-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/den-matchmaker-worker/index.ts
