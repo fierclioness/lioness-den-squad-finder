@@ -6,6 +6,9 @@ class UnconfirmedCleanupState extends Error {}
 const SNOW=/^\d{15,22}$/;
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A PostgreSQL int8 listing ID must not be rounded through JavaScript Number.
+const exactListingId=value=>typeof value==="string" && /^[1-9]\d{0,18}$/.test(value) &&
+  BigInt(value)<=9223372036854775807n;
 const one = result => {
  if(!result || !Array.isArray(result.rows)) throw Error("Invalid trusted DB result");
  return result.rows[0]??null;
@@ -41,8 +44,8 @@ export function makeCleanupOutboxWorker({
   if(typeof workerId!=="string"||!UUID.test(workerId))throw Error("Invalid cleanup worker id");
   const claim=await call("select matchmaker_internal.claim_cleanup($1::uuid) as listing_id",[workerId]);
   if(claim?.listing_id==null)return {status:"empty"};
-  const listingId=String(claim.listing_id);
-  if(!/^\d+$/.test(listingId))throw Error("Untrusted claimed cleanup id");
+  if(!exactListingId(claim.listing_id))throw Error("Untrusted claimed cleanup id");
+  const listingId=claim.listing_id;
   let confirmedAbsent=false;
   try{
    // Compare the claimed job to the ORIGINAL trusted receipt and listing state.
@@ -59,7 +62,7 @@ export function makeCleanupOutboxWorker({
    const expired=rec?.expires_at!=null && Number.isFinite(Date.parse(String(rec.expires_at))) &&
      Date.parse(String(rec.expires_at))<=clock();
    const inactive=rec?.listing_status==="closed"||rec?.listing_status==="expired"||expired;
-   const safe=rec&&String(rec.listing_id)===listingId&&inactive &&
+   const safe=rec&&exactListingId(rec.listing_id)&&rec.listing_id===listingId&&inactive &&
      exactSnow(rec.message_id) &&
      rec.message_id===rec.receipt_message_id &&
      rec.channel_id===channelId && rec.receipt_channel_id===channelId &&
