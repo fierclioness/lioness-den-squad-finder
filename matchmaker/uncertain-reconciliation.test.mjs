@@ -108,3 +108,16 @@ test("operator-assisted recovery cannot coerce or round PostgreSQL bigint listin
  assert.equal(check({listing:{...listing,id:large},
    outbox:{...outbox,listingId:"9007199254740992"},operatorApproved:true}).decision,"block");
 });
+
+
+test("operator-approved reconciliation refuses coerced worker claim UUIDs",()=>{
+ const claim="4b09c61a-f47b-40af-8d59-321baae87e9f";
+ const valid=check({outbox:{...outbox,claimedBy:claim},operatorApproved:true});
+ assert.equal(valid.decision,"record_confirmed_receipt","Primitive UUID claims remain valid");
+ for(const bad of [new String(claim),{toString:()=>claim},{valueOf:()=>claim},
+  [claim],42,42n,true,{}]){
+  const result=check({outbox:{...outbox,claimedBy:bad},operatorApproved:true});
+  assert.equal(result.decision,"block","Untrusted claim cannot authorize recording a receipt");
+  assert.equal(result.messageId,undefined);
+ }
+});
