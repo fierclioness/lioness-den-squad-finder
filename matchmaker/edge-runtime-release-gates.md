@@ -1,6 +1,6 @@
 # Den Matchmaker Edge — staging verification and release gates
 
-**Status: deployed only in isolated staging, NOT approved for the Lioness Den production release.** The Edge entrypoint in `supabase/functions/den-matchmaker/index.ts` is deployed to **Den Matchmaker Staging** (`tcxktyqywsqafnyxhpgy`) as version 10 (safe private-confirmation queue isolation, bounded request body, honest /squad list disclosure). Den Missions production (`cpjcjcxinhjusosaguyi`) and the original manual Squad Finder have not changed.
+**Current status (November 20, 2026): isolated staging only, NOT approved for production.** Edge `den-matchmaker` in Supabase `tcxktyqywsqafnyxhpgy` is now **v18 ACTIVE**. Earlier numbered versions and command-disabled observations below are **dated historical test evidence**, not current staging configuration. An authorized restricted-tester private-only `/squad` create → preview → confirm → mine/list → close test is documented as successful, with no queued public posting. Commands are restricted to approved testers; **public posting and scheduler remain OFF**, and no live original-bot publishing/GET-before-DELETE cleanup E2E has been approved. Production Den Missions (`cpjcjcxinhjusosaguyi`), the original manual Squad Finder and the draft PR merge state remain unchanged. Read-only Edge log evidence: eight v18 successful POSTs, server-side execution p95 433 ms and max 433 ms; this is **not** a Discord-client-visible three-second ACK measurement.
 
 ## Verified November 19, 2026
 
@@ -31,10 +31,10 @@
 
 ## Gates that remain BLOCKING
 
-1. Verify full `/squad` create → ephemeral preview → owner confirmation → mine/list/close with a safely installed and explicitly authorized *test app*. No guild commands are currently registered; command execution is OFF.
+1. **Private-only restricted tester command flow: verified historically on v18.** Preserve the signed create → ephemeral preview → owner confirmation → mine/list/close evidence, but separately measure genuine Discord-client first-response latency under three seconds across cold starts, DB delays and failure paths. No broader guild registration, public posting, app-setting change or launch is authorized.
 2. Measure **actual** command acknowledgement performance within Discord's 3-second initial-response deadline, including cold starts, database delays, failure paths, and non-2xx responses. One successful PING does not satisfy this.
-3. Finish audited bot-only posting transport and cleanup scheduling, fixed destination channel and bot identity, reply restrictions, and explicit posting feature gates. A timed-out POST remains uncertain and is NEVER automatically retried; deletion must GET and verify the original bot-owned message first.
-4. Test uncertain-delivery reconciliation, close/expiry races, duplicate suppression and outbox recovery under isolated controlled conditions. Never expose an unsafe retry mechanism.
+3. Independently review and authorize the existing **review-only** bot-owned posting and cleanup workers, authenticated scheduling, fixed destination channel and bot identity, reply restrictions, and explicit posting feature gates. A timed-out POST remains uncertain and is NEVER automatically retried; deletion must GET and verify the original bot-owned message first.
+4. Retain successful offline/disposable-PostgreSQL uncertain-delivery, close/expiry-race, duplicate suppression and outbox-recovery tests; **still require separately approved bot-owned Discord POST + GET-before-DELETE and scheduler/expiry real E2E**. Never expose an unsafe retry mechanism.
 5. Review production migrations, least-privilege credentials, rollback, retention and monitoring separately. **No production deployments, merges, Discord application installation, public posts or deletes without explicit approval.**
 6. Keep the original `https://fierclioness.github.io/lioness-den-squad-finder/` available as a fallback and avoid modifying the separate Den Missions bot.
 
