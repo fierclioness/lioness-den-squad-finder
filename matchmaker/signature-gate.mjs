@@ -30,11 +30,12 @@ export function makeSignatureGate({
     const signed=Buffer.concat([Buffer.from(timestamp,"utf8"),rawBody]);
     if(!verifySignature(null,signed,publicKey,sig))throw new Error("Invalid request signature");
     const data=JSON.parse(rawBody.toString("utf8"));
-    if(!data||typeof data!=="object"||!/^\d{15,22}$/.test(String(data.id||"")))
+    if(!data||typeof data!=="object"||typeof data.id!=="string"||
+       !/^\d{15,22}$/.test(data.id))
       throw new Error("Invalid interaction ID");
     // In-memory replay protection is sufficient for tests ONLY, not multi-instance prod.
     for(const [id,expiresAt] of seen)if(expiresAt<=now)seen.delete(id);
-    const id=String(data.id);
+    const id=data.id;
     if(seen.has(id))throw new Error("Replay detected");
     seen.set(id,now+toleranceMs);
     return data;
