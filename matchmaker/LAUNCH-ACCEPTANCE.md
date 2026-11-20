@@ -1,4 +1,11 @@
 # Den Matchmaker — launch acceptance and rollback checklist
+
+## Nov 20, 2026 UTC — exact-string Discord actor identity (DRAFT ONLY)
+
+Review found that the signed command dispatcher accepted numeric/boxed member IDs after coercing them to strings, potentially losing precision in Discord's 19-digit snowflakes before private listing operations. The dispatcher now requires an exact 15–22 digit **primitive string** and rejects Number, BigInt, boxed String, and missing IDs before contacting storage; a legitimate exact-string actor still works. Added an offline regression that asserts **zero private store calls** for rejected IDs. Commits `6d298047` and `7b08953c`; all GitHub CI **PASS**: [Node 174/174](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251408), [Edge TypeScript](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251402), and [disposable PostgreSQL](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251626) (0 Node failures). This is defense in depth, not evidence of real Discord /squad command execution or three-second client ACK.
+
+Read-only staging: dedicated `tcxktyqywsqafnyxhpgy` Edge v17 ACTIVE, seven private RLS tables, zero listings/previews/post/cleanup/receipts/audit, one previous genuine signed-PING replay. New code is **review-only, NOT deployed**. Commands, public posting, scheduler OFF. Separate authorized live client E2E, authenticated worker rollout, bot-owned posting/cleanup, independent security review, and explicit production authorization remain **OPEN**. Den Missions production `cpjcjcxinhjusosaguyi`, live Discord app, member records and original manual Squad Finder untouched.
+
 **Review-only checklist · November 19, 2026. Not launch authorization.**
 
 ## November 19, 2026 — privacy/replay retention design verified in disposable PostgreSQL (REVIEW ONLY)
