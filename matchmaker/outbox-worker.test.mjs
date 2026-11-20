@@ -138,3 +138,20 @@ test("untrusted numeric/boxed Discord delivery IDs cannot write a receipt",async
   assert.throws(()=>makeOutboxWorker({query,sendMessage,enabled:true,channelId,botUserId:id}),/Trusted configured/);
  }
 });
+
+test("rounded, boxed or out-of-range private listing claims never reach Discord",async()=>{
+ const badIds=[12,Number("9007199254740993"),12n,new String("12"),
+  "0","012","1e1","9223372036854775808",{}];
+ for(const id of badIds){
+  let dbCalls=0,sends=0;
+  const query=async(sql)=>{
+   dbCalls++;
+   if(sql.includes("claim_post"))return {rows:[{id}]};
+   throw Error("Untrusted claim reached another private query");
+  };
+  const worker=create(query,async()=>{sends++;throw Error("Unsafe public send");});
+  await assert.rejects(worker.runOnce(),/Untrusted claimed post listing ID/);
+  assert.equal(dbCalls,1,"invalid claim cannot fetch or mutate a listing");
+  assert.equal(sends,0,"invalid claim cannot create a Discord post");
+ }
+});
