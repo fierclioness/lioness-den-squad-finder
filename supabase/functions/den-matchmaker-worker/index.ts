@@ -6,6 +6,9 @@ import {withSupabase} from "npm:@supabase/server@1";
 const disabled=()=>Response.json({status:"disabled"},{
  status:503,headers:{"cache-control":"no-store"}
 });
-Deno.serve(withSupabase({auth:"secret:den-matchmaker-scheduler"},async()=>{
- return disabled();
-}));
+// Supabase's documented Edge wrapper uses the default exported fetch handler.
+export default {
+ fetch:withSupabase({auth:"secret:den-matchmaker-scheduler"},async()=>{
+  return disabled();
+ })
+};
