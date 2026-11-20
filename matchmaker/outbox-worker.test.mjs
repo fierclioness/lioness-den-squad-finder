@@ -155,3 +155,17 @@ test("rounded, boxed or out-of-range private listing claims never reach Discord"
   assert.equal(sends,0,"invalid claim cannot create a Discord post");
  }
 });
+
+test("public outbox rejects forged channel mentions even if unsafe data bypasses draft validation",async()=>{
+ let sends=0,quarantines=0;
+ const query=async sql=>{
+  if(sql.includes("claim_post"))return {rows:[{id:"12"}]};
+  if(sql.includes("squad_listings"))return {rows:[{...listing,availability:"Meet in <#1546529501859815438>"}]};
+  if(sql.includes("fail_post")){quarantines++;return {rows:[{ok:true}]};}
+  throw Error("Unexpected persistence after unsafe mention");
+ };
+ const result=await create(query,async()=>{sends++;}).runOnce();
+ assert.equal(result.status,"uncertain");
+ assert.equal(sends,0);
+ assert.equal(quarantines,1);
+});
