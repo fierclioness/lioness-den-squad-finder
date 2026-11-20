@@ -1,3 +1,11 @@
+## November 20, 2026 UTC — worker-side exact-string Discord receipt validation (DRAFT / REVIEW ONLY)
+
+Fixed an additional trust-boundary gap in the review-only publish and cleanup workers. Both workers now require **primitive exact-string** fixed channel/bot IDs when enabled; the publisher refuses numeric, BigInt or boxed message IDs from an injected transport before recording a receipt, and the cleanup worker refuses malformed/numeric original message IDs even when both private receipt fields agree. The invalid publish outcome is quarantined as **uncertain** without any receipt write; invalid cleanup evidence is quarantined **without DELETE**. Two new adversarial tests cover imprecise identifiers and valid paths.
+
+**Verified final-code CI on `6a882fbf`:** [179/179 Node tests PASS, zero failures](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44687660188), [Edge TypeScript and hosted staging negative HTTP PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44687660193), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44687660254). Node results and job steps independently read. This verifies offline/CI guards, **not** real Discord posting, deletion or client ACK latency.
+
+**Read-only isolated staging:** `tcxktyqywsqafnyxhpgy` Edge `den-matchmaker` v17 ACTIVE; 0 listings/previews/post jobs/cleanup jobs/post receipts and 1 previous genuine signed-PING replay claim. New worker changes remain **branch-only** and undeployed. Commands, posting and scheduling **OFF**. Draft PR #2 unmerged; no changes to Den Missions production `cpjcjcxinhjusosaguyi`, Discord app/guild/member data or original manual Squad Finder. Real authorized `/squad` under-3s client ACK, separately approved staging worker and bot-owned post/GET-before-DELETE E2E, independent security review and explicit launch approval still outstanding.
+
 # Den Matchmaker — launch acceptance and rollback checklist
 
 ## November 20, 2026 UTC — uncertain-delivery receipt IDs fail closed (DRAFT / REVIEW ONLY)
