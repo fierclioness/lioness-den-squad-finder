@@ -1,5 +1,6 @@
 // Development-only verified cleanup transport. Never enabled in production here.
 // Verifies original bot ownership through Discord GET before deleting a fixed-channel post.
+import {authorizeReceiptCleanup} from "./receipt-authorization.mjs";
 const SNOW=/^\d{15,22}$/;
 // Discord snowflakes are opaque decimal strings, not safe JS numbers.
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
@@ -32,8 +33,11 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
    if(lookup.status!==200)throw Error("Could not verify original Discord post");
    let message;
    try{message=await lookup.json();}catch{throw Error("Malformed Discord author receipt");}
-   if(!exactSnow(message?.id)||message.id!==messageId||message.channel_id!==channelId||
-      message.author?.id!==botUserId||message.author?.bot!==true)
+   if(!authorizeReceiptCleanup({
+      receipt:{messageId,channelId,botUserId},
+      expected:{channelId,botUserId},
+      observedMessage:{id:message?.id,channelId:message?.channel_id,authorId:message?.author?.id}
+    })||message.author?.bot!==true)
       throw Error("Original message was not verified as our bot's post");
    // A timed-out DELETE is ambiguous. Never declare success without a 204/404 receipt.
    const removal=await fetchFn(url,{method:"DELETE",headers,redirect:"error",signal:AbortSignal.timeout(requestTimeoutMs)});
