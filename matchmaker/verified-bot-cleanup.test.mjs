@@ -188,3 +188,17 @@ test("matching IDs with non-bot or missing bot flag never authorize DELETE",asyn
   assert.deepEqual(methods,["GET"]);
  }
 });
+
+test("malformed Discord GET payloads never authorize DELETE",async()=>{
+ for(const payload of [null,[],{}, {id:messageId,channel_id:channelId},
+  {...good(),author:null}, {...good(),author:[]},
+  {...good(),author:{id:botUserId,bot:1}}]){
+  const methods=[];
+  const cleanup=create(async(_url,init)=>{
+   methods.push(init.method);
+   return {status:200,json:async()=>payload};
+  });
+  await assert.rejects(cleanup.remove(messageId),/not verified/);
+  assert.deepEqual(methods,["GET"],"Malformed Discord response must not reach DELETE");
+ }
+});
