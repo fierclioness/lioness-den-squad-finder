@@ -32,14 +32,14 @@ export function validateDraft(draft) {
   };
 }
 export function createListing({ownerId, draft, nowMs = Date.now(), existing = []}) {
-  if (!SNOWFLAKE.test(String(ownerId))) throw new Error("Invalid Discord member ID");
+  if (typeof ownerId !== "string" || !SNOWFLAKE.test(ownerId)) throw new Error("Invalid Discord member ID");
   if (!Number.isSafeInteger(nowMs) || nowMs < 0) throw new Error("Invalid timestamp");
-  if (existing.some(item => item.ownerId === String(ownerId) && item.status === "active" && item.expiresAt > nowMs)) {
+  if (existing.some(item => item.ownerId === ownerId && item.status === "active" && item.expiresAt > nowMs)) {
     throw new Error("Close your existing listing before making another");
   }
   const fields = validateDraft(draft);
   return Object.freeze({
-    ownerId: String(ownerId),
+    ownerId,
     ...fields,
     createdAt: nowMs,
     expiresAt: nowMs + LISTING_TTL_MS,
@@ -47,7 +47,8 @@ export function createListing({ownerId, draft, nowMs = Date.now(), existing = []
   });
 }
 export function closeListing(listing, requesterId, nowMs = Date.now()) {
-  if (!listing || listing.ownerId !== String(requesterId)) throw new Error("Only the listing owner may close it");
+  if (!listing || typeof requesterId !== "string" || !SNOWFLAKE.test(requesterId) || listing.ownerId !== requesterId)
+    throw new Error("Only the listing owner may close it");
   if (listing.status !== "active" || listing.expiresAt <= nowMs) throw new Error("Listing not active");
   return {...listing, status:"closed", closedAt:nowMs};
 }
