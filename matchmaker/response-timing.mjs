@@ -55,6 +55,14 @@ export function evaluateTimingSamples(samples,{budgetMs=LOCAL_BUDGET_MS}={}){
   throw Error("Valid timing samples required");
  const sorted=[...samples].sort((a,b)=>a-b);
  const p95=sorted[Math.ceil(.95*sorted.length)-1];
- return {count:samples.length,p95Ms:p95,maxMs:sorted.at(-1),
-   withinLocalBudget:p95<budgetMs && sorted.at(-1)<DISCORD_DEADLINE_MS};
+ const maxMs=sorted.at(-1);
+ // A p95-only gate can hide a slow outlier: with 20 samples, a single
+ // 2,450ms response leaves p95 at the fast value. Release review must not
+ // report that all responses met the 2,000ms local headroom budget.
+ // Even a true result here is only OFFLINE diagnostic evidence, never
+ // proof of Discord-client/network acknowledgment within three seconds.
+ return {count:samples.length,p95Ms:p95,maxMs,
+   p95WithinLocalBudget:p95<budgetMs,
+   allWithinDiscordDeadline:maxMs<DISCORD_DEADLINE_MS,
+   withinLocalBudget:p95<budgetMs && maxMs<budgetMs};
 }
