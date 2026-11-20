@@ -86,3 +86,30 @@ test("old public preview cannot confirm after publishing is disabled",async()=>{
  assert.match(result.content,/settings changed/);
  assert.equal(confirms,0);
 });
+
+test("rejects numeric or boxed Discord actor IDs before any private storage access",async()=>{
+ // Discord IDs such as this one exceed Number.MAX_SAFE_INTEGER.
+ assert.notEqual(String(Number(actor.memberId)),actor.memberId);
+ let reads=0;
+ const store={
+  prepare:async()=>{reads++;throw Error("must not prepare");},
+  confirm:async()=>{reads++;throw Error("must not confirm");},
+  cancel:async()=>{reads++;throw Error("must not cancel");},
+  mine:async()=>{reads++;return null;},
+  list:async()=>{reads++;return [];},
+  close:async()=>{reads++;return false;}
+ };
+ const dispatch=makeMatchmakerDispatcher({store});
+ for(const memberId of [
+  Number(actor.memberId),BigInt(actor.memberId),new String(actor.memberId),null
+ ]){
+  await assert.rejects(
+   dispatch(command({...actor,memberId},"mine")),
+   /Invalid signed actor/,
+   "Malformed actor identity must be rejected before touching member records"
+  );
+ }
+ assert.equal(reads,0);
+ assert.match((await dispatch(command(actor,"mine"))).content,/no active listing/);
+ assert.equal(reads,1,"The original exact string identity remains accepted");
+});
