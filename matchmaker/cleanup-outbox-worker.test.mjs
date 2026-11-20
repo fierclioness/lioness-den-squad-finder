@@ -141,3 +141,33 @@ test("imprecise numeric/boxed Discord receipts never authorize removal",async()=
   }),/Trusted fixed/);
  }
 });
+
+test("rounded or noncanonical cleanup listing claims never reach Discord",async()=>{
+ const badIds=[8,Number("9007199254740993"),8n,new String("8"),
+  "0","08","8e0","9223372036854775808",{}];
+ for(const listing_id of badIds){
+  let queries=0,removals=0;
+  const worker=makeCleanupOutboxWorker({
+   enabled:true,channelId,botUserId,newWorkerId:()=>workerId,
+   query:async(sql)=>{
+    queries++;
+    if(sql.includes("claim_cleanup"))return {rows:[{listing_id}]};
+    throw Error("Untrusted claim reached a private cleanup query");
+   },
+   verifiedCleanup:{remove:async()=>{removals++;throw Error("Unsafe Discord DELETE");}}
+  });
+  await assert.rejects(worker.runOnce(),/Untrusted claimed cleanup id/);
+  assert.equal(queries,1,"no lookup or ledger mutation for an invalid claim");
+  assert.equal(removals,0,"never DELETE from a malformed database claim");
+ }
+});
+test("rounded original receipt listing IDs cannot authorize Discord cleanup",async()=>{
+ for(const badId of [8,8n,new String("8")]){
+  let removals=0;
+  const fx=fixture({rec:{...receipt(),listing_id:badId},
+   remove:async()=>{removals++;return {status:"deleted"};}});
+  assert.deepEqual(await fx.worker.runOnce(),{status:"quarantined",listingId:"8"});
+  assert.equal(removals,0);
+  assert.deepEqual(fx.state().finished,[["8",workerId,false]]);
+ }
+});
