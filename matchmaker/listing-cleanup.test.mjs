@@ -55,7 +55,7 @@ test("wrong author or bot identity blocks DELETE even with a trusted DB plan",as
 });
 test("only verified absence is terminal; Discord API errors remain unresolved",async()=>{
  const base={enabled:true,botToken:token,botUserId,channelId:channel};
- const missing=makeMessageCleanupTransport({...base,fetchFn:async()=>({status:404})});
+ const missing=makeMessageCleanupTransport({...base,fetchFn:async()=>({status:404,json:async()=>({code:10008,message:"Unknown Message"})})});
  assert.equal((await missing.removeConfirmedBotPost(planCleanup(row,{now:2000}))).status,"already_absent");
  const unauthorized=makeMessageCleanupTransport({...base,fetchFn:async()=>({status:429})});
  await assert.rejects(unauthorized.removeConfirmedBotPost(planCleanup(row,{now:2000})),/Could not verify/);
