@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - 'matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
+      - 'supabase/config.toml'
       - '.github/workflows/matchmaker-tests.yml'
   push:
     branches:
       - 'feature/den-matchmaker-mvp-2026-11-18'
     paths:
       - 'matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
+      - 'supabase/config.toml'
       - '.github/workflows/matchmaker-tests.yml'
 permissions:
   contents: read
