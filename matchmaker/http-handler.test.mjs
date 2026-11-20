@@ -254,3 +254,22 @@ test("stream transport failure and malformed Content-Length fail before replay",
  }
  assert.equal(claims,0);
 });
+
+test("only primitive UUID preview tokens may become clickable confirmation components",async()=>{
+ const valid="11111111-1111-4111-8111-111111111111";
+ let token;
+ const handle=fixture({enabled:true,dispatch:async()=>({
+  content:"Review",
+  buttons:[{action:"confirm",token,label:"Post to #squad-up"},
+           {action:"cancel",token,label:"Cancel"}]
+ })});
+ for(const bad of [new String(valid),{toString:()=>valid},[valid],12345,null,valid+"extra"]){
+  token=bad;
+  const body=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+  assert.equal(body.data.flags,64);
+  assert.equal(body.data.components,undefined,"Untrusted preview tokens cannot become Discord action IDs");
+ }
+ token=valid;
+ const success=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+ assert.equal(success.data.components[0].components[0].custom_id,"mm:confirm:"+valid+":public");
+});
