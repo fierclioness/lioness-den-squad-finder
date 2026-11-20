@@ -56,6 +56,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/stale-claims-postgres.sql
       - name: Test bounded expiry and original-receipt-only cleanup on disposable database
         run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/expiry-postgres.sql
+      - name: Test bounded privacy/replay retention in disposable PostgreSQL
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/retention-postgres.sql
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
