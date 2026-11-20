@@ -116,3 +116,28 @@ test("uncertain Discord deletion with failed quarantine acknowledgement requires
   assert.deepEqual(fx.state().finished,[["8",workerId,false]]);
  }
 });
+
+test("imprecise numeric/boxed Discord receipts never authorize removal",async()=>{
+ for(const badId of [Number(messageId),BigInt(messageId),new String(messageId)]){
+  let deletes=0;
+  // Simulate the same malformed ID in both private receipt and cleanup row,
+  // which previously passed a String(...) snowflake check and strict equality.
+  const rec={...receipt(),message_id:badId,receipt_message_id:badId};
+  const fx=fixture({rec,remove:async()=>{deletes++;return {status:"deleted"};}});
+  assert.deepEqual(await fx.worker.runOnce(),{status:"quarantined",listingId:"8"});
+  assert.equal(deletes,0);
+  assert.deepEqual(fx.state().finished,[["8",workerId,false]]);
+ }
+ const query=async()=>{throw Error("No query expected");};
+ const verifiedCleanup={remove:async()=>{throw Error("No DELETE expected");}};
+ for(const id of [Number(channelId),BigInt(channelId),new String(channelId)]){
+  assert.throws(()=>makeCleanupOutboxWorker({
+   query,verifiedCleanup,enabled:true,channelId:id,botUserId
+  }),/Trusted fixed/);
+ }
+ for(const id of [Number(botUserId),BigInt(botUserId),new String(botUserId)]){
+  assert.throws(()=>makeCleanupOutboxWorker({
+   query,verifiedCleanup,enabled:true,channelId,botUserId:id
+  }),/Trusted fixed/);
+ }
+});
