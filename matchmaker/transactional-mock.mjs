@@ -13,9 +13,13 @@ export function makeTransactionalMock({clock=()=>Date.now()}={}){
   const listings=new Map(), previews=new Map(), lastCreated=new Map(), interactions=new Map();
   const locks=new Map();
   function assertActor(actor) {
-    if(!actor || actor.guildId!==GUILD_ID || !SNOWFLAKE.test(String(actor.memberId)))
+    // Discord snowflakes cannot be safely coerced from JS Numbers/objects.
+    // This offline model must enforce the same exact actor boundary as the
+    // signed HTTP and private PostgreSQL adapters.
+    if(!actor || actor.guildId!==GUILD_ID ||
+       typeof actor.memberId!=="string" || !SNOWFLAKE.test(actor.memberId))
       throw new Error("Invalid guild member");
-    return String(actor.memberId);
+    return actor.memberId;
   }
   async function locked(key,operation){
     const prior=locks.get(key)||Promise.resolve();
@@ -88,11 +92,14 @@ export function makeTransactionalMock({clock=()=>Date.now()}={}){
   }
   // Models a durable unique interaction-ID insert. Actual storage must be cross-instance.
   async function acceptInteraction(interactionId){
-    if(!SNOWFLAKE.test(String(interactionId)))throw new Error("Invalid interaction ID");
+    // Never round or coerce a signed interaction's replay key into another
+    // member's ID. Only the original primitive Discord string is valid.
+    if(typeof interactionId!=="string" || !SNOWFLAKE.test(interactionId))
+      throw new Error("Invalid interaction ID");
     return locked("interaction:"+interactionId,async()=>{
       for(const [id,expiry] of interactions)if(expiry<=clock())interactions.delete(id);
-      if(interactions.has(String(interactionId)))return false;
-      interactions.set(String(interactionId),clock()+REPLAY_TTL_MS);
+      if(interactions.has(interactionId))return false;
+      interactions.set(interactionId,clock()+REPLAY_TTL_MS);
       return true;
     });
   }
