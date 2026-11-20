@@ -6,6 +6,10 @@ import {markerFor} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+// PostgreSQL bigint listing IDs must also stay exact strings; Number can round
+// an int8 claim and accidentally operate on a different persisted listing.
+const exactListingId=value=>typeof value==="string" && /^[1-9]\d{0,18}$/.test(value) &&
+  BigInt(value)<=9223372036854775807n;
 class UnconfirmedOutboxState extends Error {}
 function row(result){
  if(!result||!Array.isArray(result.rows))throw Error("Invalid private query result");
@@ -41,7 +45,8 @@ export function makeOutboxWorker({query,sendMessage,channelId,botUserId,enabled=
   if(typeof workerId!=="string"||!UUID.test(workerId))throw Error("Invalid worker identity");
   const result=await call("select matchmaker_internal.claim_post($1::uuid) as id",[workerId]);
   if(result?.id==null)return {status:"empty"};
-  const listingId=String(result.id);
+  if(!exactListingId(result.id))throw Error("Untrusted claimed post listing ID");
+  const listingId=result.id;
   // Fetch only a still-active listing; do not send stale/closed requests.
   let confirmed=false;
   try {
