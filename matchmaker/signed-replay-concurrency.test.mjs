@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {generateKeyPairSync,sign} from "node:crypto";
 import {makeMatchmakerHttpHandler} from "./http-handler.mjs";
+import {makeResponseTimingProbe} from "./response-timing.mjs";
 
 const {publicKey,privateKey}=generateKeyPairSync("ed25519");
 const publicKeyHex=publicKey.export({type:"spki",format:"der"}).subarray(-32).toString("hex");
@@ -116,21 +117,27 @@ test("concurrent differently signed commands reusing one interaction ID cannot b
 test("delayed durable replay claim is never skipped to meet a latency budget",async()=>{
  let releaseClaim;
  let dispatches=0;
+ let monotonicMs=10;
+ let timing;
  let enteredClaim;
  const claimantEntered=new Promise(resolve=>{enteredClaim=resolve;});
  const handle=handler({
   claimReplay:()=>new Promise(resolve=>{releaseClaim=resolve;enteredClaim();}),
   dispatch:async()=>{dispatches++;return {content:"test-only authorized response"};}
  });
- const pending=handle(signedRequest(command("1546529501859815442")));
+ const measured=makeResponseTimingProbe({handler:handle,clock:()=>monotonicMs,onResult:result=>{timing=result;}});
+ const pending=measured(signedRequest(command("1546529501859815442")));
  // The authenticated callback must NOT acknowledge or dispatch until the
  // durable replay claimant has returned, even if doing so adds latency.
  await claimantEntered;
  assert.equal(typeof releaseClaim,"function");
  assert.equal(dispatches,0);
+ // Synthetic time advance: this checks diagnostic behavior, not live network latency.
+ monotonicMs+=2450;
  releaseClaim(true);
  const response=await pending;
  assert.equal(response.status,200);
  assert.equal(dispatches,1);
  assert.equal((await response.json()).data.flags,64);
+ assert.deepEqual(timing,{elapsedMs:2450,withinLocalBudget:false,withinDiscordDeadline:true,httpStatus:200});
 });
