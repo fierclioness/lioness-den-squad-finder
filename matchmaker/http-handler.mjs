@@ -111,7 +111,8 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
    // Never pass untrusted component data through from a dispatcher.
    if(Array.isArray(result.buttons) && result.buttons.length===2 &&
       result.buttons[0]?.action==="confirm" && result.buttons[1]?.action==="cancel" &&
-      result.buttons.every(b=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(b.token||""))) &&
+      result.buttons.every(b=>typeof b.token==="string" &&
+       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.token)) &&
       result.buttons[0].token===result.buttons[1].token) {
      const token=result.buttons[0].token;
      output.data.components=[{type:1,components:[
