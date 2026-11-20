@@ -37,7 +37,7 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
       receipt:{messageId,channelId,botUserId},
       expected:{channelId,botUserId},
       observedMessage:{id:message?.id,channelId:message?.channel_id,authorId:message?.author?.id}
-    })||message.author?.bot!==true)
+    })||message?.author?.bot!==true)
       throw Error("Original message was not verified as our bot's post");
    // A timed-out DELETE is ambiguous. Never declare success without a 204/404 receipt.
    const removal=await fetchFn(url,{method:"DELETE",headers,redirect:"error",signal:AbortSignal.timeout(requestTimeoutMs)});
