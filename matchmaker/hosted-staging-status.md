@@ -1,3 +1,13 @@
+## Nov 20, 2026 UTC — exact primitive preview token consent gate (DRAFT / REVIEW ONLY)
+
+Review-only draft branch security check found preview token handling in the trusted command dispatcher and signed HTTP response adapter used `String(...)` coercion. An unexpected boxed or user-defined value could look like a valid UUID and become a clickable Discord Confirm/Cancel token without being a primitive database-issued UUID string. Both boundaries now require an **exact primitive UUID string**, rejecting boxed Strings, objects, arrays, numeric IDs, missing or malformed tokens. Two adversarial regressions confirm that only valid string tokens produce private/public consent buttons.
+
+**Verified code/test head `c8284509`:** [189/189 Node tests PASS, zero failures](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44737452191), [Edge TypeScript checks PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44737452340), [disposable PostgreSQL integration PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44737452364). Read-only isolated staging: Edge **v17 ACTIVE**, ten migrations, zero listings/previews/post/cleanup/receipts/audit, one earlier genuine signed-PING replay. Seven INFO RLS-no-policy notices relate to deliberately restricted private tables. These are offline/static checks, **not** live Discord client latency or publishing evidence.
+
+**No deployment or launch approval:** Draft PR #2 unmerged; commands, posting and scheduling OFF. Real authorized `/squad` client ACK below three seconds, separately approved authenticated worker rollout, controlled bot-owned publishing and GET-before-DELETE cleanup, independent security review, and explicit release permission remain open. Production Den Missions `cpjcjcxinhjusosaguyi`, Discord application/guild/member data, public messages and original manual Squad Finder untouched.
+
+---
+
 ## Nov 20, 2026 UTC — operator recovery bigint boundary, no deploy (REVIEW ONLY)
 
 Draft PR #2 operator-assisted uncertain Discord delivery reconciliation now rejects rounded numeric, BigInt, boxed, object-coerced, noncanonical, negative and out-of-range PostgreSQL listing IDs. The outbox ID and persisted listing ID must be identical primitive canonical signed-int8 strings; `String(...)` coercion was removed. This closes a remaining route to misassociate a recovered Discord post after operator approval. One new adversarial regression covers both identities and valid 19-digit string IDs.
