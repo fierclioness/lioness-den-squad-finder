@@ -12,6 +12,27 @@ test("disabled private config is syntactically sound but NOT cleared for deploym
  assert.ok(x.warnings.some(x=>x.includes("Three-second")));
  assert.doesNotMatch(JSON.stringify(x),/test_only/);
 });
+test("opaque proxy or local database cannot inherit release readiness from checkboxes",()=>{
+ const allEvidence={
+  ...valid,gatewayDeadlineTested:true,persistenceRuntimeTested:true,
+  guildTestAccountPassed:true,messageReconciliationTested:true,
+  privateSchemaReviewed:true,releaseApproved:true
+ };
+ for(const databaseUrl of [
+  "postgresql://proxy:placeholder@pooler.example.internal:5432/matchmaker?sslmode=require",
+  "postgresql://proxy:placeholder@private.internal:5432/postgres?sslmode=require",
+  "postgresql://proxy:placeholder@127.0.0.1:5432/postgres?sslmode=require",
+  "postgresql://postgres:placeholder@unverified.example.invalid/postgres?sslmode=require"
+ ]){
+  const result=auditMatchmakerConfig({...allEvidence,databaseUrl});
+  assert.equal(result.ok,true,"Opaque host may be syntactically valid for development");
+  assert.equal(result.readyForControlledTest,false,"Checkboxes cannot certify unknown database identity");
+  assert.ok(result.warnings.some(s=>s.includes("manual proxy/connection review")));
+  assert.doesNotMatch(JSON.stringify(result),/placeholder|proxy:placeholder/,
+   "Never leak DB credentials through preflight diagnostics");
+ }
+});
+
 test("unsafe publishing and guessed channel fail closed",()=>{
  const x=auditMatchmakerConfig({...valid,publishEnabled:true,
  channelId:valid.guildId,botToken:"testing-only-bot-token-123456789"});
@@ -27,7 +48,9 @@ test("missing keys, disabled TLS, malformed URLs and wrong guild rejected",()=>{
  assert.equal(auditMatchmakerConfig(null).ok,false);
 });
 test("all gates are explicit, no assumed approval",()=>{
- const x=auditMatchmakerConfig({...valid,gatewayDeadlineTested:true,
+ const x=auditMatchmakerConfig({...valid,
+ databaseUrl:"postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co/postgres?sslmode=require",
+ gatewayDeadlineTested:true,
  persistenceRuntimeTested:true,guildTestAccountPassed:true,messageReconciliationTested:true,privateSchemaReviewed:true,releaseApproved:true});
  assert.equal(x.readyForControlledTest,true);
  assert.equal(x.warnings.some(t=>t.includes("active")),false);
