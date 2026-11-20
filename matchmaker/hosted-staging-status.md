@@ -1,3 +1,11 @@
+## Nov 20, 2026 UTC — no staging deployment; signed replay and synthetic ACK tests green (REVIEW ONLY)
+
+Draft branch `3fb1e821` adds two signed HTTP regressions: concurrently signed different /squad payloads sharing one interaction ID admit exactly one dispatch; a held durable replay claimant blocks dispatch even when a quick ACK would be desirable. Synthetic monotonic clock 2,450 ms fails local 2,000 ms budget but remains below the 3,000 ms Discord deadline; **this does NOT measure actual Discord client, regional network, cold-start or p95 latency**. [Node 182/182 PASS #44704107127](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44704107127); [Edge PASS #44704107217](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44704107217); [disposable PostgreSQL PASS #44704107187](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44704107187).
+
+Read-only staging `tcxktyqywsqafnyxhpgy`: Edge `den-matchmaker` **v17 ACTIVE**, ten migrations and seven RLS-enabled private tables; listings/previews/post outbox/cleanup outbox/receipts/reconciliation all **0**; one previous signed-PING replay. Seven INFO RLS/no-policy notices consistent with private-only schema. **No deployment or data writes**. Commands, posting, scheduler **OFF**. Draft PR #2 unmerged. Den Missions production `cpjcjcxinhjusosaguyi`, Discord app/guild/member data and manual Squad Finder unchanged. Real authorized /squad client ACK, authenticated worker, approved bot-owned publish/cleanup, independent security review and explicit launch release remain OPEN.
+
+---
+
 ## November 20, 2026 UTC — private PostgreSQL actor trust-boundary guard (DRAFT / REVIEW ONLY)
 
 The private PostgreSQL store adapter was still coercing Discord actor identifiers using `String(actor.memberId)`, even though the signed HTTP handler and command dispatcher already reject numeric identities. Direct/future callers could otherwise round a long snowflake and query or mutate the wrong member's listing. The adapter now requires a **primitive, exact-string 15–22 digit Discord member ID** for *all* six store actions: prepare, confirm, cancel, close, mine and list. New regression covers Number, BigInt, boxed String, custom toString object, null and undefined and verifies **zero SQL calls** on rejected actors.
