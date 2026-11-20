@@ -71,3 +71,27 @@ test("redirected Discord REST reply cannot confirm a public post",async()=>{
  await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/Redirected delivery is untrusted/);
  assert.equal(calls,1,"No retries after a redirected or ambiguous delivery");
 });
+
+test("numeric Discord snowflakes and non-string receipts fail closed before trusted publication",async()=>{
+ // 19-digit Discord IDs cannot be represented precisely as JS numbers.
+ assert.notEqual(String(Number(channelId)),channelId);
+ assert.throws(()=>makeDiscordTransport({
+  enabled:true,botToken:token,channelId:Number(channelId),botUserId
+ }),/credentials/);
+ assert.throws(()=>makeDiscordTransport({
+  enabled:true,botToken:token,channelId,botUserId:Number(botUserId)
+ }),/credentials/);
+ for(const fakeReceipt of [
+  {id:Number("1546529501859815438"),channel_id:channelId,author:{id:botUserId,bot:true}},
+  {id:"1546529501859815438",channel_id:Number(channelId),author:{id:botUserId,bot:true}},
+  {id:"1546529501859815438",channel_id:channelId,author:{id:Number(botUserId),bot:true}}
+ ]){
+  let attempts=0;
+  const transport=makeDiscordTransport({
+   enabled:true,botToken:token,channelId,botUserId,
+   fetchFn:async()=>{attempts++;return {ok:true,json:async()=>fakeReceipt};}
+  });
+  await assert.rejects(transport.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/Untrusted delivery receipt/);
+  assert.equal(attempts,1,"Do not retry when the receipt identity is ambiguous");
+ }
+});
