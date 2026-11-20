@@ -38,7 +38,14 @@ jobs:
           python3 - <<'PY'
           import json
           with open('/tmp/den_health.json') as f: data=json.load(f)
-          assert data == {'service':'den-matchmaker','environment':'staging','status':'commands_disabled','posting_enabled':False,'member_data_access':False}, data
+          # Authorized test commands may be enabled in isolated staging.
+          # Keep public posting OFF and the diagnostic read-only.
+          assert data.get('service') == 'den-matchmaker', data
+          assert data.get('environment') == 'staging', data
+          assert data.get('status') in ('commands_disabled','commands_enabled'), data
+          assert data.get('posting_enabled') is False, data
+          assert data.get('member_data_access') is False, data
+          assert set(data) == {'service','environment','status','posting_enabled','member_data_access'}, data
           print('Real hosted staging HTTP health passed, no database writes')
           PY
       - name: Verify unsigned staging POST is rejected
