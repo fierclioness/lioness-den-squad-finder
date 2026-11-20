@@ -80,10 +80,13 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   try{interaction=await verifier.authenticate({rawBody:bytes,timestamp,signature});}
   catch{return json({error:"Unauthorized"},401);}
   if(interaction.type===1)return json({type:1}); // Signed PING only.
-  if(interaction.guild_id!==GUILD ||
-     !SNOWFLAKE.test(String(interaction.member?.user?.id||"")))
+  // Discord snowflakes are exact strings. Converting a JSON number to String
+  // can lose precision and accidentally match a different allowlisted actor.
+  const memberId=interaction.member?.user?.id;
+  if(interaction.guild_id!==GUILD || typeof memberId!=="string" ||
+     !SNOWFLAKE.test(memberId))
    return json(ephemeral("The Den Matchmaker is for Lioness Den members only."));
-  if(testerIds!==null && !testerIds.has(String(interaction.member.user.id)))
+  if(testerIds!==null && !testerIds.has(memberId))
    return json(ephemeral("Den Matchmaker is currently limited to authorized testers."));
   if(!enabled || typeof dispatch!=="function")
    return json(ephemeral("Den Matchmaker is in development. The current Squad Finder is available."));
@@ -95,7 +98,7 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
   try{
    const result=await dispatch({
      interactionId:interaction.id,
-     memberId:String(interaction.member.user.id),
+     memberId,
      guildId:interaction.guild_id,
      type:interaction.type,
      data:interaction.data
