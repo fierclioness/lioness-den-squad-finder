@@ -113,3 +113,24 @@ test("rejects numeric or boxed Discord actor IDs before any private storage acce
  assert.match((await dispatch(command(actor,"mine"))).content,/no active listing/);
  assert.equal(reads,1,"The original exact string identity remains accepted");
 });
+
+test("storage preview tokens must be primitive UUID strings before creating consent buttons",async()=>{
+ const valid="11111111-1111-4111-8111-111111111111";
+ let stores=0;
+ const store={
+  prepare:async()=>{stores++;return {token:nextToken};},
+  confirm:async()=>{throw Error("must not confirm");},
+  cancel:async()=>false,mine:async()=>null,list:async()=>[],close:async()=>false
+ };
+ const dispatch=makeMatchmakerDispatcher({store});
+ const opts=Object.entries(draft).map(([name,value])=>({name,value}));
+ let nextToken;
+ for(const bad of [new String(valid),{toString:()=>valid},[valid],null,12345,valid+"x"]){
+  nextToken=bad;
+  await assert.rejects(dispatch(command(actor,"create",opts)),/Invalid preview token/);
+ }
+ nextToken=valid;
+ const accepted=await dispatch(command(actor,"create",opts));
+ assert.deepEqual(accepted.buttons.map(b=>b.token),[valid,valid]);
+ assert.equal(stores,7);
+});
