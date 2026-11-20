@@ -36,13 +36,14 @@ jobs:
           python3 - <<'PY'
           import json
           with open('/tmp/den_health.json') as f: data=json.load(f)
-          assert data == {
-              'service':'den-matchmaker',
-              'environment':'staging',
-              'status':'commands_disabled',
-              'posting_enabled':False,
-              'member_data_access':False
-          }, f'Unexpected staging health JSON: {data}'
+          # Authorized tester commands may be active in isolated staging.
+          # A staging smoke must still reject public posting or data exposure.
+          assert data.get('service') == 'den-matchmaker', data
+          assert data.get('environment') == 'staging', data
+          assert data.get('status') in ('commands_disabled','commands_enabled'), data
+          assert data.get('posting_enabled') is False, data
+          assert data.get('member_data_access') is False, data
+          assert set(data) == {'service','environment','status','posting_enabled','member_data_access'}, data
           print('PASS: real hosted staging health GET, no database writes')
           PY
       - name: Verify unsigned POST fails closed with configured signing key
