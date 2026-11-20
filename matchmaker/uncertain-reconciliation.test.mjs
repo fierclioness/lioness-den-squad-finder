@@ -81,3 +81,30 @@ test("uncertain receipts reject imprecise numeric and boxed Discord snowflakes",
  assert.equal(verified.decision,"record_confirmed_receipt");
  assert.equal(verified.messageId,message.id);
 });
+
+
+test("operator-assisted recovery cannot coerce or round PostgreSQL bigint listing identities",()=>{
+ const valid=check({operatorApproved:true});
+ assert.equal(valid.decision,"record_confirmed_receipt");
+ assert.equal(valid.listingId,"27");
+ // Keep large signed int8 identifiers as exact canonical strings, including at
+ // the operator boundary. A JS Number cannot safely preserve 19-digit int8 IDs.
+ const large="9007199254740993";
+ assert.equal(check({listing:{...listing,id:large},
+   outbox:{...outbox,listingId:large},operatorApproved:true}).decision,"record_confirmed_receipt");
+ for(const invalid of [27,27n,new Number(27),new String("27"),
+   {toString:()=>"27"},"027","0","-1","9223372036854775808",
+   Number(large),BigInt(large),undefined,null]){
+  for(const side of ["listing","outbox"]){
+   const changed=side==="listing"
+     ?{listing:{...listing,id:invalid}}
+     :{outbox:{...outbox,listingId:invalid}};
+   const result=check({...changed,operatorApproved:true});
+   assert.equal(result.decision,"block",side+" must reject untrusted listing identity");
+   assert.equal(result.messageId,undefined,"No receipt can be recorded");
+  }
+ }
+ // Distinct exact strings cannot collide via rounded Number conversion.
+ assert.equal(check({listing:{...listing,id:large},
+   outbox:{...outbox,listingId:"9007199254740992"},operatorApproved:true}).decision,"block");
+});
