@@ -1,5 +1,14 @@
 # Den Matchmaker Staging — hosted implementation record
 
+## Nov 20, 2026 UTC — signed actor / replay precision review-only correction
+
+Two branch-only defenses: (1) the signed HTTP handler rejects non-string `member.user.id` rather than turning JSON numbers into precision-rounded allowlisted actors; (2) the Node **offline-only** signature gate rejects non-string interaction IDs, preserving exact replay identity. The deployed WebCrypto verifier already required string interaction IDs. Two new signed end-to-end HTTP/offline tests show malformed IDs rejected with **zero dispatcher operations**, legitimate exact-string requests accepted, and exact-string replay still denied on a second attempt.
+
+GitHub CI on code head `ed7b3135` passed: [Node 176/176](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44672989838), [Edge TypeScript](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44672989858), and [disposable PostgreSQL integration](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44672989854); Node job logs confirm 0 failures.
+
+Read-only staging inventory: isolated project `tcxktyqywsqafnyxhpgy` Edge v17 ACTIVE (not redeployed); 10 migrations, 7 private RLS tables, 0 listings/previews/post or cleanup jobs/receipts/reconciliation rows, 1 previous genuine PING replay. Seven INFO RLS-without-policy advisor notices remain consistent with intentional deny-by-default internal schema. All new code is REVIEW ONLY; commands, posting, scheduler OFF; PR #2 remains draft/unmerged. No application, guild, member, production Den Missions `cpjcjcxinhjusosaguyi`, or original manual Squad Finder changes. Client-observed /squad ACK, separately authorized worker/publishing/cleanup E2E, independent security review and release approval remain unverified.
+
+
 ## Nov 20, 2026 UTC — exact Discord actor IDs remain strings (review-only)
 
 Updated draft-only `command-dispatcher.mjs` to refuse numeric, BigInt, boxed or absent member IDs **before any private database operation**. Previous coercion through `String(input.memberId)` could silently lose snowflake precision. One new regression verifies zero store reads/writes for invalid actor identities and acceptance of the original exact-string ID. Commits `6d298047`, `7b08953c`; CI all PASS: [Node 174/174](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251408), [Edge TypeScript](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251402), and [disposable PostgreSQL](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44670251626), 0 failures. This is offline proof, **not** client-observed /squad acknowledgement timing. No deployment of the change.
