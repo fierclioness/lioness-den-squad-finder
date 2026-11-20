@@ -33,8 +33,8 @@ export function makeScheduledWorkerComposition({
  if(transientRetentionEnabled&&!maintenanceEnabled)
   throw Error("Transient retention requires the separate maintenance feature gate");
  if((postingEnabled||cleanupEnabled)&&(!destinationReviewed||
-    !SNOW.test(String(channelId))||String(channelId)===GUILD||
-    !SNOW.test(String(botUserId))||String(botUserId)===String(channelId)))
+    (typeof channelId!=="string"||!SNOW.test(channelId))||channelId===GUILD||
+    (typeof botUserId!=="string"||!SNOW.test(botUserId))||botUserId===channelId))
   throw Error("Independently reviewed Discord text channel and bot identity required");
  const outbound=makeDiscordTransport({
   botToken,channelId,botUserId,fetchFn,enabled:postingEnabled,requestTimeoutMs
