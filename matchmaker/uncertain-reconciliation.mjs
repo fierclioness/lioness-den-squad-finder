@@ -7,13 +7,17 @@ const snow=/^\d{15,22}$/;
 // Discord snowflakes cannot be represented safely as JavaScript numbers.
 // Reject numeric, boxed, or bigint identifiers rather than coercing them.
 const exactSnow=value=>typeof value==="string"&&snow.test(value);
+// A rounded PostgreSQL int8 listing ID must never authorize an operator
+// to attach a Discord receipt to a different record. No String() coercion.
+const exactListingId=value=>typeof value==="string" && /^[1-9]\d{0,18}$/.test(value) &&
+  BigInt(value)<=9223372036854775807n;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function assessUncertainDelivery({listing,outbox,message,channelId,botUserId,operatorApproved=false}={}){
  if(!listing||!outbox||!exactSnow(channelId)||!exactSnow(botUserId))
   throw Error("Trusted reconciliation context required");
  if(!["uncertain","sending"].includes(outbox.state))
   return {decision:"no_action",reason:"Not an unresolved delivery"};
- if(outbox.listingId==null||String(outbox.listingId)!==String(listing.id))
+ if(!exactListingId(outbox.listingId)||!exactListingId(listing.id)||outbox.listingId!==listing.id)
   return {decision:"block",reason:"Listing and delivery identity mismatch"};
  if(!message)
   return {decision:"manual_review",reason:"Absence of evidence is not proof of an unsent Discord POST"};
