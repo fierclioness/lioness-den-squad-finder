@@ -4,9 +4,12 @@
 // destination and expected bot author; an operator must approve the action.
 import {verifyReferenceMatch} from "./listing-reference.mjs";
 const snow=/^\d{15,22}$/;
+// Discord snowflakes cannot be represented safely as JavaScript numbers.
+// Reject numeric, boxed, or bigint identifiers rather than coercing them.
+const exactSnow=value=>typeof value==="string"&&snow.test(value);
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function assessUncertainDelivery({listing,outbox,message,channelId,botUserId,operatorApproved=false}={}){
- if(!listing||!outbox||!snow.test(String(channelId||""))||!snow.test(String(botUserId||"")))
+ if(!listing||!outbox||!exactSnow(channelId)||!exactSnow(botUserId))
   throw Error("Trusted reconciliation context required");
  if(!["uncertain","sending"].includes(outbox.state))
   return {decision:"no_action",reason:"Not an unresolved delivery"};
@@ -14,7 +17,7 @@ export function assessUncertainDelivery({listing,outbox,message,channelId,botUse
   return {decision:"block",reason:"Listing and delivery identity mismatch"};
  if(!message)
   return {decision:"manual_review",reason:"Absence of evidence is not proof of an unsent Discord POST"};
- if(!snow.test(String(message.id||""))||message.channel_id!==channelId||
+ if(!exactSnow(message.id)||message.channel_id!==channelId||
     message.author?.id!==botUserId||message.author?.bot!==true)
   return {decision:"block",reason:"Original Discord message identity not verified"};
  if(outbox.claimedBy!=null&&!uuid.test(String(outbox.claimedBy)))
@@ -35,7 +38,7 @@ export function assessUncertainDelivery({listing,outbox,message,channelId,botUse
  if(operatorApproved!==true)
   return {decision:"approval_required",reason:"A verified receipt still requires explicit reconciliation approval"};
  return {decision:"record_confirmed_receipt",listingId:String(listing.id),
-   messageId:String(message.id),channelId,botUserId,
+   messageId:message.id,channelId,botUserId,
    cleanupRequired:listing.status!=="active" || expiresAt<=Date.now()};
 }
 export function assessNotFoundEvidence({searchComplete=false}={}){
