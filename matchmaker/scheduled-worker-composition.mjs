@@ -21,14 +21,17 @@ const SNOW=/^\d{15,22}$/;
 export function makeScheduledWorkerComposition({
  query,fetchFn=fetch,schedulerSecret="",schedulerEnabled=false,
  postingEnabled=false,cleanupEnabled=false,maintenanceEnabled=false,
+ transientRetentionEnabled=false,
  destinationReviewed=false,botToken="",channelId="",botUserId="",
  requestTimeoutMs=5000,batchSize=50,staleMinutes=10
 }={}){
  if(typeof query!=="function"||typeof fetchFn!=="function")
   throw Error("Trusted private database and Discord connectors required");
- if([schedulerEnabled,postingEnabled,cleanupEnabled,maintenanceEnabled,destinationReviewed]
+ if([schedulerEnabled,postingEnabled,cleanupEnabled,maintenanceEnabled,transientRetentionEnabled,destinationReviewed]
      .some(flag=>typeof flag!=="boolean"))
   throw Error("Feature gates and destination review must be booleans");
+ if(transientRetentionEnabled&&!maintenanceEnabled)
+  throw Error("Transient retention requires the separate maintenance feature gate");
  if((postingEnabled||cleanupEnabled)&&(!destinationReviewed||
     !SNOW.test(String(channelId))||String(channelId)===GUILD||
     !SNOW.test(String(botUserId))||String(botUserId)===String(channelId)))
@@ -46,7 +49,8 @@ export function makeScheduledWorkerComposition({
   query,verifiedCleanup,channelId,botUserId,enabled:cleanupEnabled
  });
  const maintenance=makeMaintenanceWorker({
-  query,enabled:maintenanceEnabled,batchSize,staleMinutes
+  query,enabled:maintenanceEnabled,batchSize,staleMinutes,
+  transientRetentionEnabled
  });
  return makeScheduledWorkerGateway({
   schedulerSecret,enabled:schedulerEnabled,postingEnabled,cleanupEnabled,
