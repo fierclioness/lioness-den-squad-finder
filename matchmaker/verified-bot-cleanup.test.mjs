@@ -202,3 +202,13 @@ test("malformed Discord GET payloads never authorize DELETE",async()=>{
   assert.deepEqual(methods,["GET"],"Malformed Discord response must not reach DELETE");
  }
 });
+
+test("unreadable Discord GET JSON cannot authorize DELETE",async()=>{
+ let deletes=0;
+ const cleanup=create(async(_url,init)=>{
+  if(init.method==="DELETE"){deletes++;return {status:204};}
+  return {status:200,json:async()=>{throw Error("truncated response body");}};
+ });
+ await assert.rejects(cleanup.remove(messageId),/Malformed Discord author receipt/);
+ assert.equal(deletes,0);
+});
