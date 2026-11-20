@@ -47,3 +47,23 @@ test("rejects request replay, forged member ID, and unsupported command",()=>{
  assert.match(app.handleSigned(forged).body.data.content,/Only members/);
  assert.match(app.handleSigned(signed({type:2,guild_id,member,data:{name:"squad",options:[{name:"secret"}]}})).body.data.content,/Use \/squad/);
 });
+
+test("offline signed adapter refuses imprecise numeric and array-coerced actor IDs",()=>{
+ const isolated=makeOfflineDiscordAdapter({publicKeyHex,clock:()=>now});
+ const exact=member.user.id;
+ assert.notEqual(String(Number(exact)),exact,"synthetic Discord ID demonstrates JS precision loss");
+ for(const id of [Number(exact),[exact],null,123456789012345,{},["1234567890123456789"]]){
+  const attempt=isolated.handleSigned(signed({
+   ...create,member:{user:{id}}
+  }));
+  assert.equal(attempt.httpStatus,200);
+  assert.equal(attempt.body.data.flags,64);
+  assert.match(attempt.body.data.content,/Only members/);
+  assert.equal(attempt.body.data.components,undefined,"invalid actor cannot create a preview");
+ }
+ const valid=isolated.handleSigned(signed(create));
+ assert.equal(valid.httpStatus,200);
+ assert.equal(valid.body.data.flags,64);
+ assert.equal(valid.body.data.components?.[0]?.components?.length,2,
+  "genuine primitive string actor still reaches the offline preview");
+});
