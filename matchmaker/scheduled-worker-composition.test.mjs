@@ -219,3 +219,37 @@ test("scheduler cleanup refuses to delete a different bot's message",async()=>{
  assert.deepEqual(await second.json(),{task:"cleanup",status:"empty"});
  assert.equal(deletes,0);
 });
+
+test("retention needs its own flag and authenticated maintenance route",async()=>{
+ let sqlCalls=0,discordCalls=0,retentionCalls=0;
+ const query=async(sql,params)=>{
+  sqlCalls++;
+  assert.deepEqual(params[0]===2?[2]:params.slice(-1),[2]);
+  if(sql.includes("purge_expired_transient_rows")){
+   retentionCalls++;
+   return {rows:[{replays_purged:1,previews_purged:1}]};
+  }
+  return {rows:[{affected:0}]};
+ };
+ const fetchFn=async()=>{discordCalls++;throw Error("Discord cannot be used");};
+ assert.throws(()=>makeScheduledWorkerComposition({
+  query,fetchFn,transientRetentionEnabled:true
+ }),/requires the separate maintenance/);
+ assert.throws(()=>makeScheduledWorkerComposition({
+  query,fetchFn,maintenanceEnabled:true,transientRetentionEnabled:"true",
+  schedulerEnabled:true,schedulerSecret:secret
+ }),/booleans/);
+ const handle=makeScheduledWorkerComposition({
+  query,fetchFn,schedulerEnabled:true,maintenanceEnabled:true,
+  transientRetentionEnabled:true,batchSize:2,schedulerSecret:secret
+ });
+ assert.equal((await handle(request("maintenance","not-the-key"))).status,401);
+ assert.equal((await handle(request("publish"))).status,403);
+ assert.equal(sqlCalls,0);
+ const result=await handle(request("maintenance"));
+ assert.equal(result.status,200);
+ assert.deepEqual(await result.json(),{task:"maintenance",status:"complete"});
+ assert.equal(sqlCalls,4);
+ assert.equal(retentionCalls,1);
+ assert.equal(discordCalls,0);
+});
