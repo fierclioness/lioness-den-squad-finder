@@ -17,9 +17,13 @@ export function makeOfflineDiscordAdapter({publicKeyHex,clock=()=>Date.now()}){
     try{interaction=gate.authenticate({rawBody,timestamp,signature});}
     catch{return {httpStatus:401,body:{error:"Unauthorized"}};}
     if(interaction.type===1) return {httpStatus:200,body:{type:1}}; // Signed PING only.
-    if(interaction.guild_id!==GUILD_ID || !MEMBER_ID.test(String(interaction.member?.user?.id||"")))
+    // Keep the signed JSON actor exact. Numbers lose Discord snowflake precision,
+    // while arrays can stringify to someone else's ID. Never coerce ownership.
+    const memberId=interaction.member?.user?.id;
+    if(interaction.guild_id!==GUILD_ID || typeof memberId!=="string" ||
+       !MEMBER_ID.test(memberId))
       return {httpStatus:200,body:reply("Only members of The Lioness Den may use Matchmaker.")};
-    const actor={guildId:interaction.guild_id,memberId:String(interaction.member.user.id)};
+    const actor={guildId:interaction.guild_id,memberId};
     try{
       let result;
       if(interaction.type===2 && interaction.data?.name==="squad"){
