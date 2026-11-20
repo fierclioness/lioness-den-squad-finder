@@ -109,3 +109,32 @@ test("missing listing with false safety write never returns unsent or uncertain 
  assert.equal(sends,0);
  assert.equal(failCalls,1);
 });
+
+test("untrusted numeric/boxed Discord delivery IDs cannot write a receipt",async()=>{
+ const exact="1546529501859815438";
+ for(const messageId of [Number(exact),BigInt(exact),new String(exact)]){
+  const sql=[];
+  let sends=0;
+  const query=async statement=>{
+   sql.push(statement);
+   if(statement.includes("claim_post"))return {rows:[{id:"12"}]};
+   if(statement.includes("squad_listings"))return {rows:[listing]};
+   if(statement.includes("fail_post"))return {rows:[{ok:true}]};
+   throw Error("Invalid numeric delivery was persisted");
+  };
+  const result=await create(query,async()=>({
+    confirmed:true,messageId,channelId,botUserId
+  })).runOnce();
+  assert.equal(result.status,"uncertain");
+  assert.equal(sql.filter(s=>s.includes("finish_post_with_receipt")).length,0);
+  assert.equal(sql.filter(s=>s.includes("fail_post")).length,1);
+ }
+ const query=async()=>{throw Error("Should not reach database");};
+ const sendMessage=async()=>{throw Error("Should not send");};
+ for(const id of [Number(channelId),BigInt(channelId),new String(channelId)]){
+  assert.throws(()=>makeOutboxWorker({query,sendMessage,enabled:true,channelId:id,botUserId}),/Trusted configured/);
+ }
+ for(const id of [Number(botUserId),BigInt(botUserId),new String(botUserId)]){
+  assert.throws(()=>makeOutboxWorker({query,sendMessage,enabled:true,channelId,botUserId:id}),/Trusted configured/);
+ }
+});
