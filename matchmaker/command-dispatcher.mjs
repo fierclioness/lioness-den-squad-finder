@@ -9,9 +9,12 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
  if(!store||methods.some(k=>typeof store[k]!=="function"))throw Error("Complete trusted storage adapter required");
  if(typeof publishingEnabled!=="boolean")throw Error("Publishing feature flag must be a boolean");
  return async input=>{
-  if(input?.guildId!==guild||!/^\d{15,22}$/.test(String(input.memberId||"")))
+  // Discord snowflakes are opaque decimal strings. Numeric IDs can lose
+  // precision and must never be used to authorize a member's storage actions.
+  if(input?.guildId!==guild || typeof input.memberId!=="string" ||
+     !/^\d{15,22}$/.test(input.memberId))
    throw Error("Invalid signed actor");
-  const actor={guildId:guild,memberId:String(input.memberId)},data=input.data;
+  const actor={guildId:guild,memberId:input.memberId},data=input.data;
   if(input.type===2&&data?.name==="squad"){
    const sub=data.options?.[0];
    if(sub?.name==="create"){
