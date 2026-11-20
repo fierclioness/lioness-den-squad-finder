@@ -3,7 +3,7 @@
 // Production transitions must be atomic database operations with strict ownership checks.
 export const POST_STATES = Object.freeze(["pending","sending","posted","uncertain","failed","cancelled"]);
 export function newOutbox({listingId,ownerId,now=Date.now()}){
- if(typeof listingId!=="string"||!listingId || !/^\d{15,22}$/.test(ownerId))throw Error("Invalid listing identity");
+ if(typeof listingId!=="string"||!listingId || (typeof ownerId!=="string" || !/^\d{15,22}$/.test(ownerId)))throw Error("Invalid listing identity");
  return {listingId,ownerId,state:"pending",attempts:0,createdAt:now,updatedAt:now,messageId:null,lastError:null};
 }
 export function claimPost(row,{workerId,now=Date.now(),maxAttempts=3}){
