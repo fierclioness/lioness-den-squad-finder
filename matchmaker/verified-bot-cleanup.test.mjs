@@ -170,3 +170,21 @@ test("DELETE 404 may finish only on Discord Unknown Message; other 404s need rec
  assert.deepEqual(await safelyAbsent.remove(messageId),{status:"already_absent"});
  assert.deepEqual(methods,["GET","DELETE"]);
 });
+
+// Regression: even matching IDs cannot authorize a deletion unless Discord
+// identifies the author as a bot (not merely as a matching account).
+test("matching IDs with non-bot or missing bot flag never authorize DELETE",async()=>{
+ for(const author of [
+  {id:botUserId,bot:false},
+  {id:botUserId},
+  {id:botUserId,bot:"true"}
+ ]){
+  const methods=[];
+  const cleanup=create(async(_url,init)=>{
+   methods.push(init.method);
+   return {status:200,json:async()=>({...good(),author})};
+  });
+  await assert.rejects(cleanup.remove(messageId),/not verified/);
+  assert.deepEqual(methods,["GET"]);
+ }
+});
