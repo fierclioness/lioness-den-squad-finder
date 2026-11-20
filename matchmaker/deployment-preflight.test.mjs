@@ -104,3 +104,28 @@ test("preflight cannot approve another Supabase project or disguised host even i
   assert.equal(result.readyForControlledTest,true,"Only previously evidenced gates permit readiness");
  }
 });
+
+
+test("publishing preflight refuses imprecise channel and bot IDs before any rollout",()=>{
+ const channelId="1546529501859815480";
+ const botUserId="1546529501859815481";
+ const approvedShape={...valid,commandsEnabled:true,publishEnabled:true,
+   channelId,botUserId,botToken:"testing-only-bot-token-123456789"};
+ const good=auditMatchmakerConfig(approvedShape);
+ assert.equal(good.ok,true,"primitive exact-string identities remain acceptable");
+ assert.equal(good.readyForControlledTest,false,"passing identity checks is not launch approval");
+ for(const field of ["channelId","botUserId"]){
+  for(const bad of [Number(approvedShape[field]),BigInt(approvedShape[field]),
+    new String(approvedShape[field]),null,undefined,{"toString":()=>approvedShape[field]}]){
+   const report=auditMatchmakerConfig({...approvedShape,[field]:bad});
+   assert.equal(report.ok,false,field+" must reject non-string identities");
+   assert.equal(report.readyForControlledTest,false);
+   assert.ok(report.errors.some(message=>message.includes(
+     field==="channelId"?"destination channel ID":"original bot user ID")));
+  }
+ }
+ const missing=auditMatchmakerConfig({...approvedShape,botUserId:undefined});
+ assert.equal(missing.ok,false,"publishing cannot pass preflight without verified bot identity");
+ assert.equal(auditMatchmakerConfig({...approvedShape,channelId:botUserId}).ok,true,
+   "valid distinct string snowflakes do not require a hardcoded destination");
+});
