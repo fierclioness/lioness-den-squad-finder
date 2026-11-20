@@ -1,3 +1,11 @@
+## Nov 20, 2026 UTC — database confirmation identity validation, no deployment (REVIEW ONLY)
+
+Review-only draft PR #2 now rejects boxed/object-coerced UUID previews at the **private PostgreSQL storage boundary**, rather than converting them to primitive strings and bypassing consent-button validation. Confirmed listing IDs also require primitive canonical in-range PostgreSQL int8 strings; rounded JavaScript numeric IDs cannot become trusted confirmation receipts. Two new adversarial regression tests; [Node **191/191 PASS** #44748413032](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44748413032), [Edge/hosted negative HTTP PASS #44748413223](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44748413223), [disposable PostgreSQL PASS #44748413161](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44748413161) on code/test commit `3ad8a668`.
+
+Read-only staging `tcxktyqywsqafnyxhpgy`: Edge v17 ACTIVE; seven private RLS tables; **0** listings/previews/publish/cleanup/receipt/reconciliation rows, **1** earlier genuine signed PING replay. Seven INFO restricted-RLS/no-policy advisor notices. **No new deployment, migrations or data writes.** Commands/posting/scheduler OFF; PR draft/unmerged. Production Den Missions `cpjcjcxinhjusosaguyi`, Discord app/guild/member data and manual Squad Finder unchanged. Still need real authorized `/squad` client ACK <3s, separately approved authenticated worker and controlled bot-owned post/GET-before-DELETE cleanup, independent security review and explicit launch authorization.
+
+---
+
 ## Nov 20, 2026 UTC — exact primitive preview token consent gate (DRAFT / REVIEW ONLY)
 
 Review-only draft branch security check found preview token handling in the trusted command dispatcher and signed HTTP response adapter used `String(...)` coercion. An unexpected boxed or user-defined value could look like a valid UUID and become a clickable Discord Confirm/Cancel token without being a primitive database-issued UUID string. Both boundaries now require an **exact primitive UUID string**, rejecting boxed Strings, objects, arrays, numeric IDs, missing or malformed tokens. Two adversarial regressions confirm that only valid string tokens produce private/public consent buttons.
