@@ -96,3 +96,31 @@ test("redirected GET never authorizes DELETE; redirected DELETE never confirms c
  await assert.rejects(redirectedDelete.remove(messageId),/Redirected Discord deletion/);
  assert.equal(deletes,1,"No retry after potentially ambiguous DELETE");
 });
+
+test("numeric Discord snowflakes never authorize bot-message deletion",async()=>{
+ assert.notEqual(String(Number(messageId)),messageId);
+ assert.throws(()=>makeVerifiedBotCleanup({
+  enabled:true,botToken,botUserId,channelId:Number(channelId)
+ }),/Trusted bot identity/);
+ assert.throws(()=>makeVerifiedBotCleanup({
+  enabled:true,botToken,botUserId:Number(botUserId),channelId
+ }),/Trusted bot identity/);
+ let calls=0;
+ const safe=create(async()=>{calls++;return {status:200,json:async()=>good()};});
+ await assert.rejects(safe.remove(Number(messageId)),/Invalid original message receipt/);
+ assert.equal(calls,0,"Invalid numeric message ID must not reach Discord GET");
+ for(const fake of [
+  {...good(),id:Number(messageId)},
+  {...good(),channel_id:Number(channelId)},
+  {...good(),author:{id:Number(botUserId),bot:true}}
+ ]){
+  let gets=0,deletes=0;
+  const cleanup=create(async(_url,options)=>{
+   if(options.method==="GET"){gets++;return {status:200,json:async()=>fake};}
+   deletes++;return {status:204};
+  });
+  await assert.rejects(cleanup.remove(messageId),/not verified/);
+  assert.equal(gets,1);
+  assert.equal(deletes,0,"Numeric author, channel or message IDs cannot authorize DELETE");
+ }
+});
