@@ -1,3 +1,12 @@
+## Verified primitive recovery-worker claim gate — 2026-11-20 UTC (review-only)
+
+- The operator-assisted uncertain-delivery reconciler now requires the persisted worker claim UUID to be a **primitive string** before validating it. No boxed String, object with toString/valueOf, array, number or BigInt can be coerced into a trusted recovery claim, even when operatorApproved=true. Existing canonical primitive UUID claims still succeed. Added adversarial test.
+- Code/test head `94bcd377`: **196/196 Node tests PASS** ([CI #44776048647](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44776048647)), [Edge TypeScript/negative hosted checks PASS #44776048526](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44776048526), [disposable PostgreSQL integration PASS #44776048657](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44776048657). Source and test readback confirmed. No live Discord interaction/client ACK or publishing was tested.
+- Read-only isolated staging: Edge v17 ACTIVE; zero listings/previews/posting/cleanup/receipts/audit; one prior signed PING replay. **No deployment or database writes**. Draft PR remains unmerged. Commands, posting and scheduler OFF. Den Missions production, live Discord app/guild/member data, public messages and original manual Squad Finder unchanged.
+- Remaining independent launch gates: actual authorized /squad ACK <3 seconds; separately approved authenticated workers and controlled bot-owned publish/GET-before-DELETE cleanup; independent security review and explicit release authorization. **NOT launch-ready.**
+
+---
+
 ## Nov 20, 2026 UTC — Discord cleanup 404 cannot masquerade as verified deletion (DRAFT / REVIEW ONLY)
 
 Independent cleanup review found that a generic HTTP 404 from Discord (including an unknown channel or proxy error) was previously treated as proof that an original bot-owned message was absent. The GET-before-DELETE and DELETE receipt paths now accept an **already-absent** outcome only for HTTP 404 with exact Discord JSON error code **10008 (Unknown Message)**. Code **10003 (Unknown Channel)**, string-coerced codes, unreadable error bodies and other 404s fail closed for reconciliation; they cannot prematurely complete cleanup. Two new adversarial regressions plus a corrected existing composed-transport fixture. Official Discord error-code definitions: https://github.com/discord/discord-api-docs/blob/main/developers/topics/opcodes-and-status-codes.mdx.
