@@ -57,3 +57,27 @@ test("verified active receipt requires cleanup on expired timestamp only",()=>{
  const dateObject=check({listing:{...listing,status:"active",expiresAt:new Date("2000-01-01T00:00:00Z")},operatorApproved:true});
  assert.equal(dateObject.cleanupRequired,true);
 });
+
+test("uncertain receipts reject imprecise numeric and boxed Discord snowflakes",()=>{
+ // This gate can be called by an operator-assisted recovery flow.
+ // Even a correctly bound reference + approval cannot trust a rounded ID.
+ for(const badId of [Number(message.id),BigInt(message.id),new String(message.id)]){
+  const result=check({message:{...message,id:badId},operatorApproved:true});
+  assert.equal(result.decision,"block");
+  assert.equal(result.messageId,undefined);
+ }
+ for(const badAuthor of [Number(botUserId),BigInt(botUserId),new String(botUserId)]){
+  const result=check({message:{...message,author:{id:badAuthor,bot:true}},operatorApproved:true});
+  assert.equal(result.decision,"block");
+ }
+ for(const badChannel of [Number(channelId),BigInt(channelId),new String(channelId)]){
+  const result=check({message:{...message,channel_id:badChannel},operatorApproved:true});
+  assert.equal(result.decision,"block");
+ }
+ assert.throws(()=>check({channelId:Number(channelId),botUserId:Number(botUserId),operatorApproved:true}),/Trusted reconciliation context/);
+ assert.throws(()=>check({channelId:new String(channelId),operatorApproved:true}),/Trusted reconciliation context/);
+ assert.throws(()=>check({botUserId:BigInt(botUserId),operatorApproved:true}),/Trusted reconciliation context/);
+ const verified=check({operatorApproved:true});
+ assert.equal(verified.decision,"record_confirmed_receipt");
+ assert.equal(verified.messageId,message.id);
+});
