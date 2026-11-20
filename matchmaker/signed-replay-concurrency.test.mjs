@@ -93,3 +93,43 @@ test("replay storage outage fails closed before any command dispatch",async()=>{
  assert.deepEqual(await response.json(),{error:"Unauthorized"});
  assert.equal(dispatches,0);
 });
+
+test("concurrent differently signed commands reusing one interaction ID cannot both dispatch",async()=>{
+ const store=durableMock();
+ const executed=[];
+ const handle=handler({claimReplay:id=>store.claimReplay(id),
+  dispatch:async input=>{executed.push(input.data.options?.[0]?.name);return {content:"test-only response"};}});
+ // Two authentic test signatures containing the same interaction ID but
+ // different signed commands must still contend for ONE durable replay key.
+ const id="1546529501859815441";
+ const [first,second]=await Promise.all([
+  handle(signedRequest(command(id))),
+  handle(signedRequest({...command(id),data:{name:"squad",options:[{name:"mine"}]}}))
+ ]);
+ assert.deepEqual([first.status,second.status].sort((a,b)=>a-b),[200,401]);
+ assert.equal(store.attempts,2);
+ assert.equal(store.claimed.size,1);
+ assert.equal(executed.length,1,"signed payload variation must not bypass durable replay");
+ assert.ok(["list","mine"].includes(executed[0]));
+});
+
+test("delayed durable replay claim is never skipped to meet a latency budget",async()=>{
+ let releaseClaim;
+ let dispatches=0;
+ let started=0;
+ const handle=handler({
+  claimReplay:()=>new Promise(resolve=>{releaseClaim=resolve;}),
+  dispatch:async()=>{dispatches++;return {content:"test-only authorized response"};}
+ });
+ const pending=handle(signedRequest(command("1546529501859815442")));
+ // The authenticated callback must NOT acknowledge or dispatch until the
+ // durable replay claimant has returned, even if doing so adds latency.
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(typeof releaseClaim,"function");
+ assert.equal(dispatches,0);
+ releaseClaim(true);
+ const response=await pending;
+ assert.equal(response.status,200);
+ assert.equal(dispatches,1);
+ assert.equal((await response.json()).data.flags,64);
+});
