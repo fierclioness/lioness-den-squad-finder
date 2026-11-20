@@ -49,3 +49,49 @@ test("failed SQL never proceeds to later maintenance steps",async()=>{
  await assert.rejects(runner.runOnce(),/Database unavailable/);
  assert.equal(count,1);
 });
+
+test("transient retention is separately opt-in, bounded, and never sends Discord messages",async()=>{
+ const observed=[];
+ const runner=makeMaintenanceWorker({
+  enabled:true,transientRetentionEnabled:true,batchSize:2,staleMinutes:15,
+  query:async(sql,params)=>{
+   observed.push({sql,params});
+   if(sql.includes("purge_expired_transient_rows"))
+    return {rows:[{replays_purged:"2",previews_purged:1}]};
+   return {rows:[{affected:0}]};
+  }
+ });
+ assert.deepEqual(await runner.runOnce(),{
+  status:"complete",expired:0,stalePost:0,staleCleanup:0,
+  replaysPurged:2,previewsPurged:1
+ });
+ assert.equal(observed.length,4);
+ assert.deepEqual(observed[3].params,[2]);
+ assert.match(observed[3].sql,/^select replays_purged,previews_purged from matchmaker_internal.purge_expired_transient_rows\(\$1::integer\)$/);
+ assert.ok(observed.every(entry=>!entry.sql.includes("discord.com")));
+});
+test("transient retention rejects non-boolean opt-in and invalid private database counts",async()=>{
+ assert.throws(()=>makeMaintenanceWorker({
+  query:async()=>({rows:[]}),transientRetentionEnabled:"true"
+ }),/feature gate required/);
+ let calls=0;
+ const runner=makeMaintenanceWorker({
+  query:async(sql)=>{
+   calls++;
+   return sql.includes("purge_expired_transient_rows")
+    ? {rows:[{replays_purged:1,previews_purged:501}]}
+    : {rows:[{affected:0}]};
+  },enabled:true,transientRetentionEnabled:true,batchSize:2
+ });
+ await assert.rejects(runner.runOnce(),/Unexpected private maintenance operation count/);
+ assert.equal(calls,4);
+ const safeDefault=makeMaintenanceWorker({
+  query:async(sql)=>{
+   assert.doesNotMatch(sql,/purge_expired_transient_rows/);
+   return {rows:[{affected:0}]};
+  },enabled:true,batchSize:2
+ });
+ assert.deepEqual(await safeDefault.runOnce(),{
+  status:"complete",expired:0,stalePost:0,staleCleanup:0
+ });
+});
