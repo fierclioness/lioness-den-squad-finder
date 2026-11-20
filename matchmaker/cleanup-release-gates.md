@@ -1,5 +1,8 @@
 # Squad listing close/expiry: release-safe message lifecycle
 
+**Current review status (November 20, 2026):** Draft PR #2 remains unmerged; no original-bot publishing, cleanup or scheduler has been enabled. Isolated staging Edge `den-matchmaker` is v18 ACTIVE; this is not a live-worker deployment. Verified offline/disposable-PostgreSQL tests exercise GET-before-DELETE, immutable bot-owned receipts and uncertain-delivery quarantine, but **no authorized real Discord bot-owned post or deletion E2E has occurred**. Only a Discord HTTP **404 with exact numeric JSON error code 10008 (Unknown Message)** can prove already-absent; a generic 404, **10003 (Unknown Channel)**, malformed body or inaccessible channel is ambiguous and must remain in reconciliation. Client-observed ACK below three seconds, scheduler/expiry E2E, independent security review and explicit release approval remain open. Production Den Missions and original manual Squad Finder remain untouched.
+
+
 This is an architectural review for the existing *draft* Matchmaker. Nothing was deployed or deleted from Discord.
 
 ## Expected behavior
@@ -7,10 +10,10 @@ This is an architectural review for the existing *draft* Matchmaker. Nothing was
 - After 36 hours: mark listing expired; use the same removal flow. No user DMs or general channel notifications.
 - If a listing was never posted (pending/failed/cancelled), there is nothing public to delete.
 - If publishing was **sending** or **uncertain**, do not delete blindly or re-post. Resolve which Discord message (if any) belongs to that listing before cleanup.
-- A 204 from Discord's delete endpoint confirms deletion; a 404 for an already verified, bot-owned original post can be considered absent. A 429, 403, timeout, or 5xx must not be treated as successful deletion.
+- A verified HTTP 204 from Discord's delete endpoint confirms deletion. HTTP 404 means already-absent **only** with exact numeric Discord JSON error code 10008 (Unknown Message); 10003 (Unknown Channel), empty/malformed error bodies, 403/429, timeout or 5xx do **not** establish removal and require reconciliation.
 
 ## Critical database requirements (now implemented in isolated staging; production still blocked)
-1. Persist *which* guild/channel and original bot author were used to create each posting receipt. The current review schema stores message ID only; it is insufficient to prove channel + ownership for live cleanup.
+1. Persist *which* guild/channel and original bot author were used to create each posting receipt. **Historical gap resolved in the isolated review schema:** posting receipts now retain the message, channel and bot IDs, and cleanup compares these with the original private receipt. Independent validation and authorized live testing remain necessary before deployment.
 2. Add a durable cleanup outbox with a unique listing ID, pending/claimed/verified-absent/uncertain states; conditional claims and transactionally recorded results. Reconciliation must not be implemented as an in-memory loop.
 3. Prevent publication if a member closes while a worker is holding a publish claim. Coordinate close/publish state in a transaction; otherwise a stale post may appear after close.
 4. Never use broad Manage Messages permission merely to perform own-post cleanup. Use the bot's own message identity and least permissions.
@@ -28,8 +31,8 @@ Discord official API source: https://github.com/discord/discord-api-docs/blob/ma
 ## Verification hardening added
 
 - `verified-bot-cleanup.mjs` now retrieves the exact original message from the fixed channel, validates channel + message ID, and checks that Discord identifies the author as the expected bot before a delete request is permitted.
-- Its transport is DISABLED by default. A 204 deletion is success, 404 means missing, and any other status remains unresolved for reconciliation. Tests prove ordinary members' and other bots' messages are never deleted in the simulated transport.
-- The verified transport is still not wired to a durable cleanup outbox. It does not solve concurrent close-vs-post races, so scheduled cleanup remains a **release blocker**, not a finished launch feature.
+- Its transport is DISABLED by default. A 204 deletion confirms removal; **only** a 404 with numeric Discord `code: 10008` confirms already-absent. Unknown Channel (`10003`), malformed/empty 404, or any other ambiguous status remains unresolved. Tests prove ordinary members' and other bots' messages are never deleted in the simulated transport.
+- **Historical note:** the verified transport was initially unwired. The later `cleanup-outbox-worker.mjs` review implementation now uses a durable private cleanup claim and original receipt, with disposable PostgreSQL race tests; the real authenticated worker is **not deployed or authorized**, so scheduled cleanup remains a **release blocker**.
 
 ## November 19: reviewed durable cleanup orchestrator (NOT deployed)
 
