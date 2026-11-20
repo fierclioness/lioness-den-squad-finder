@@ -43,3 +43,10 @@ test("unpublished request may be cancelled",()=>{
  assert.throws(()=>claimPost(cancelOutbox(pending),{workerId:"w"}));
  assert.throws(()=>newOutbox({listingId,ownerId:"someone"}),/identity/);
 });
+
+test("offline outbox refuses imprecise numeric or coerced Discord owner identities",()=>{
+ for(const invalid of [Number(ownerId),BigInt(ownerId),new String(ownerId),{toString:()=>ownerId},null,undefined]){
+  assert.throws(()=>newOutbox({listingId,ownerId:invalid}),/identity/);
+ }
+ assert.equal(newOutbox({listingId,ownerId}).ownerId,ownerId);
+});
