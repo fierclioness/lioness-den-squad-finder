@@ -253,3 +253,24 @@ test("retention needs its own flag and authenticated maintenance route",async()=
  assert.equal(retentionCalls,1);
  assert.equal(discordCalls,0);
 });
+
+test("scheduler composition rejects coerced Discord channel and bot IDs before any side effects",()=>{
+ let calls=0;
+ const query=async()=>{calls++;throw Error("DB must not be reached");};
+ const fetchFn=async()=>{calls++;throw Error("Discord must not be reached");};
+ for(const [badChannel,badBot] of [
+  [Number(channelId),botUserId],
+  [new String(channelId),botUserId],
+  [[channelId],botUserId],
+  [channelId,Number(botUserId)],
+  [channelId,new String(botUserId)],
+  [channelId,[botUserId]]
+ ]){
+  assert.throws(()=>makeScheduledWorkerComposition({
+   query,fetchFn,schedulerEnabled:true,postingEnabled:true,
+   destinationReviewed:true,schedulerSecret:secret,botToken:token,
+   channelId:badChannel,botUserId:badBot
+  }),/reviewed Discord/);
+ }
+ assert.equal(calls,0);
+});
