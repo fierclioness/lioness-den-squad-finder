@@ -1,12 +1,11 @@
-// DRAFT ONLY — Den Matchmaker worker Edge entrypoint. NOT deployed.
-// This scaffold deliberately has NO database connection and NO Discord credentials.
-// Supabase named-secret authentication runs before the disabled worker response.
-// Never replace this 503 response with real workers without passing release gates.
+// DRAFT ONLY — independently authenticated, inert worker Edge entrypoint.
+// NOT deployed. No database connection, no Discord credentials, no scheduler.
+// This file remains deliberately self-contained for a safe auth-only smoke test.
+// Never add worker calls until CI, key isolation and controlled release gates pass.
 import {withSupabase} from "npm:@supabase/server@1";
-import {makeSupabaseAuthenticatedScheduler} from "../../../matchmaker/supabase-authenticated-scheduler.mjs";
-import {makeScheduledWorkerGateway} from "../../../matchmaker/scheduled-worker-gateway.mjs";
-const gateway=makeScheduledWorkerGateway(); // disabled; no worker task enabled
-const handler=makeSupabaseAuthenticatedScheduler({
- withSupabase,gateway,enabled:false
+const disabled=()=>Response.json({status:"disabled"},{
+ status:503,headers:{"cache-control":"no-store"}
 });
-Deno.serve(handler);
+Deno.serve(withSupabase({auth:"secret:den-matchmaker-scheduler"},async()=>{
+ return disabled();
+}));
