@@ -13,3 +13,10 @@ test("inert worker scaffold cannot touch private database or Discord",()=>{
   assert.doesNotMatch(source,unsafe);
  }
 });
+
+test("JWT bypass is scoped only to the named-secret worker, never the Discord webhook",()=>{
+ const config=readFileSync(new URL("../supabase/config.toml",import.meta.url),"utf8");
+ assert.match(config,/\[functions\.den-matchmaker-worker\]\s*verify_jwt\s*=\s*false/);
+ assert.doesNotMatch(config,/\[functions\.den-matchmaker\]/);
+ assert.equal((config.match(/verify_jwt\s*=\s*false/g)||[]).length,1);
+});
