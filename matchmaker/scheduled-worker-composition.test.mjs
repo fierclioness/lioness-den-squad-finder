@@ -266,11 +266,13 @@ test("scheduler composition rejects coerced Discord channel and bot IDs before a
   [channelId,new String(botUserId)],
   [channelId,[botUserId]]
  ]){
-  assert.throws(()=>makeScheduledWorkerComposition({
-   query,fetchFn,schedulerEnabled:true,postingEnabled:true,
-   destinationReviewed:true,schedulerSecret:secret,botToken:token,
-   channelId:badChannel,botUserId:badBot
-  }),/reviewed Discord/);
+  for(const gate of ["postingEnabled","cleanupEnabled"]){
+   assert.throws(()=>makeScheduledWorkerComposition({
+    query,fetchFn,schedulerEnabled:true,[gate]:true,
+    destinationReviewed:true,schedulerSecret:secret,botToken:token,
+    channelId:badChannel,botUserId:badBot
+   }),/reviewed Discord/);
+  }
  }
  assert.equal(calls,0);
 });
