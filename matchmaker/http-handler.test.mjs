@@ -49,6 +49,27 @@ test("cross-guild rejected and dispatcher cannot create non-ephemeral replies",a
  assert.equal(good.data.flags,64);
  assert.equal(good.data.content,"Only a private response");
 });
+test("signed HTTP boundary rejects numeric or malformed actor IDs before dispatch",async()=>{
+ let dispatches=0;
+ // Numeric Discord snowflakes round in JavaScript. The rounded string is
+ // deliberately allowlisted here to catch an accidental String(number) bypass.
+ const rounded=String(1418199180287148073);
+ assert.notEqual(rounded,member.user.id);
+ const handle=fixture({enabled:true,allowedTesterIds:new Set([rounded,member.user.id]),
+  dispatch:async({memberId})=>{dispatches++;return {content:memberId};}});
+ for(const id of [1418199180287148073,123456789012345,null,{},["1418199180287148073"]]){
+  const response=await handle(signed({type:2,guild_id,member:{user:{id}},data:{name:"squad"}}));
+  assert.equal(response.status,200);
+  const body=await response.json();
+  assert.equal(body.data.flags,64);
+  assert.match(body.data.content,/Lioness Den members only/);
+ }
+ assert.equal(dispatches,0,"Invalid signed actors must never reach the dispatcher");
+ const valid=await (await handle(signed({type:2,guild_id,member,data:{name:"squad"}}))).json();
+ assert.equal(valid.data.content,member.user.id);
+ assert.equal(dispatches,1);
+});
+
 test("unavailable replay ledger denies valid signed request",async()=>{
  const handle=makeMatchmakerHttpHandler({publicKeyHex:hex,clock:()=>now,claimReplay:async()=>{throw Error("db down");}});
  assert.equal((await handle(signed({type:1}))).status,401);
