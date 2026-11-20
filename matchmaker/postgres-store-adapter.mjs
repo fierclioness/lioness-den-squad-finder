@@ -9,9 +9,13 @@ const SNOWFLAKE=/^\d{15,22}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function owner(actor){
- if(!actor || actor.guildId!==GUILD || !SNOWFLAKE.test(String(actor.memberId||"")))
+ // The private storage adapter is a separate trust boundary. Do not coerce
+ // numeric, BigInt or boxed Discord snowflakes: precision loss could cause
+ // a direct caller to read or mutate a different member's listing.
+ if(!actor || actor.guildId!==GUILD || typeof actor.memberId!=="string" ||
+    !SNOWFLAKE.test(actor.memberId))
    throw Error("Invalid verified Discord actor");
- return String(actor.memberId);
+ return actor.memberId;
 }
 function token(value){
  if(typeof value!=="string" || !UUID.test(value))throw Error("Invalid preview token");
