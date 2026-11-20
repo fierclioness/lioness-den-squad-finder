@@ -6,7 +6,7 @@ Date: 2026-11-20. Source: **read-only SQL against isolated staging project** `tc
 - `matchmaker_internal` schema USAGE: `anon=false`, `authenticated=false`, `service_role=true`.
 - Across seven ordinary private tables: `anon` and `authenticated` each have **0 SELECT, 0 INSERT, 0 DELETE** table privileges.
 - `service_role` has **7 SELECT, 7 INSERT, 6 DELETE** table privileges. This is broad privileged access, **not least-privilege worker authorization**.
-- This read-only audit did not change any grants, roles, records or Edge Functions.
+- Across 20 private SQL functions: `anon` and `authenticated` can execute **0**, while `service_role` can execute **20**.\n- This read-only audit did not change any grants, roles, records or Edge Functions.
 
 ## Security implications
 - The lack of public schema/table privileges is positive defense in depth.
