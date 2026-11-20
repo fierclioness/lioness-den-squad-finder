@@ -19,3 +19,8 @@ Neither model has been implemented end to end in the currently undeployed schedu
 - Keep posting, Discord cleanup and scheduler OFF until separate controlled-test authorization and verification.
 
 Current isolated staging project `tcxktyqywsqafnyxhpgy` only has `den-matchmaker` deployed; no `den-matchmaker-worker` deployed as of the last read-only check. No secrets are stored in this document.
+
+## Architecture selected after checking current Supabase documentation
+**Choose the named-secret service-to-service model**, not a fabricated user JWT. Supabase's [Securing Edge Functions](https://supabase.com/docs/guides/functions/auth) documents `withSupabase({auth:'secret:<name>'}, handler)` with `verify_jwt=false` for cron/worker calls. A dedicated named secret key in the `apikey` header is checked by Supabase's supported wrapper; the gateway independently checks `x-matchmaker-scheduler-key`. A generic `auth:'secret'` accepting any project secret key is less restrictive than a named key and should not be used for this worker.
+
+**Status: architecture chosen, not implemented or deployed.** Do not turn off JWT verification on the existing `den-matchmaker` function as part of this work. Only a separate `den-matchmaker-worker` function may use the new service-auth configuration. Before enabling anything, confirm a dedicated named key exists, pin the supported wrapper dependency, wire the actual private SQL connector, test both auth layers and secret rotation, and re-run CI. Never store the key value in GitHub, logs, or this document.
