@@ -3,6 +3,17 @@
 import {pointsAtWrongSupabaseProject} from "./staging-runtime-config.mjs";
 const SNOW=/^\d{15,22}$/;
 const KEY=/^[a-f0-9]{64}$/i;
+// A syntactically valid proxy/localhost URL is not proof the connection is
+// isolated to the approved staging project. This conservative launch check
+// does NOT change runtime's separately reviewed private-proxy compatibility.
+const STAGING_REF="tcxktyqywsqafnyxhpgy";
+function attributableToStaging(url){
+ const host=url.hostname.toLowerCase();
+ if(host==="db."+STAGING_REF+".supabase.co")return true;
+ if(!/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(host))return false;
+ const username=decodeURIComponent(url.username).toLowerCase();
+ return new RegExp("^[a-z0-9_]+\\."+STAGING_REF+"$").test(username);
+}
 export function auditMatchmakerConfig(config) {
   const errors=[],warnings=[];
   if(!config || typeof config!=="object")return {ok:false,readyForControlledTest:false,errors:["Missing configuration"],warnings:[]};
@@ -12,6 +23,7 @@ export function auditMatchmakerConfig(config) {
   if(publish!==false&&publish!==true)errors.push("Publishing flag must be a boolean");
   if(typeof config.publicKeyHex!=="string"||!KEY.test(config.publicKeyHex))
     errors.push("Discord public key is missing or invalid");
+  let attributableDatabase=false;
   if(typeof config.databaseUrl!=="string"||!/^postgres(?:ql)?:\/\//i.test(config.databaseUrl))
     errors.push("A private PostgreSQL URL is not configured");
   else{
@@ -23,6 +35,9 @@ export function auditMatchmakerConfig(config) {
       // never produce a green read-only Matchmaker deployment preflight.
       if(pointsAtWrongSupabaseProject(config.databaseUrl))
         errors.push("Database URL is outside approved isolated Matchmaker staging routing");
+      attributableDatabase=!pointsAtWrongSupabaseProject(config.databaseUrl)&&attributableToStaging(url);
+      if(!attributableDatabase)
+        warnings.push("Database endpoint cannot be independently attributed to approved Supabase staging; manual proxy/connection review required before controlled release");
       if(url.username===""||url.password==="")errors.push("Database credentials are missing");
       // pg-connection-string query parameters can shadow URL authority values,
       // e.g. ?host=other-project overrides the reviewed hostname. Never clear
@@ -81,5 +96,5 @@ export function auditMatchmakerConfig(config) {
     config.privateSchemaReviewed===true,
     config.releaseApproved===true
   ];
-  return {ok:errors.length===0,readyForControlledTest:errors.length===0&&operationalRequirements.every(Boolean),errors,warnings};
+  return {ok:errors.length===0,readyForControlledTest:errors.length===0&&attributableDatabase&&operationalRequirements.every(Boolean),errors,warnings};
 }
