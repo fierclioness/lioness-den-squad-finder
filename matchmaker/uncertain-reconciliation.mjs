@@ -24,7 +24,9 @@ export function assessUncertainDelivery({listing,outbox,message,channelId,botUse
  if(!exactSnow(message.id)||message.channel_id!==channelId||
     message.author?.id!==botUserId||message.author?.bot!==true)
   return {decision:"block",reason:"Original Discord message identity not verified"};
- if(outbox.claimedBy!=null&&!uuid.test(String(outbox.claimedBy)))
+ // Worker identity is as sensitive as the listing ID: never coerce a
+ // boxed or object-supplied UUID into a trusted recovery claim.
+ if(outbox.claimedBy!=null&&(typeof outbox.claimedBy!=="string"||!uuid.test(outbox.claimedBy)))
   return {decision:"block",reason:"Untrusted worker claim"};
  // Only the original bot's authenticated message may supply this marker.
  // The reference comes from private PostgreSQL, not a member ID or user input.
