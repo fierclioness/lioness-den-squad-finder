@@ -2,6 +2,13 @@
 
 Status: **review only**. No permission to enable Discord posting, deletion, scheduler, or production launch. This checklist is not launch approval.
 
+## Verified signed offline actor guard — Nov 20, 2026 (DRAFT / no deployment)
+- Security review found that the **legacy offline signed Discord adapter**, unlike the deployed signed HTTP handler, converted JSON member IDs with `String(...)` before authorizing and constructing the actor. A rounded JavaScript Number or a one-element array could be interpreted as a different, valid Discord snowflake. This was confined to the offline demonstration; do not treat the demo as a launch security boundary.
+- Draft-only source and adversarial test updated in `matchmaker/discord-adapter-offline.mjs` and `discord-adapter-offline.test.mjs`. The adapter now requires an original **primitive exact-string member ID** and preserves it without coercion. Invalid numeric, array, null and object forms produce only an ephemeral rejection and cannot create a preview; a genuine string still works.
+- **Verified** at test commit `d378ba5f`: [219/219 Node tests passed](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44820922510), [Edge TypeScript and hosted negative HTTP passed](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44820922567), and [disposable PostgreSQL integration passed](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44820922680). Source/test GitHub readback confirmed the exact-string guard and new regression.
+- Isolated staging read-only: Edge `den-matchmaker` v18 ACTIVE; seven private RLS-enabled tables; one listing, one preview, nine replay rows and **zero** posting jobs, cleanup jobs, receipts or reconciliation audits. No migrations, database writes, deployment, Discord configuration changes, guild installation, messages, member edits, production Den Missions modifications or original manual Squad Finder replacement.
+- **Still NOT launch-ready**: real client-visible acknowledgement latency under 3s, separately authorized authenticated scheduler and original-bot POST/GET-before-DELETE cleanup E2E, expiry/race testing, independent security review and explicit release consent are open. PR #2 remains DRAFT/unmerged.
+
 ## Verified staging baseline
 - Separate Supabase staging project `tcxktyqywsqafnyxhpgy`, Edge function `den-matchmaker` v18 active.
 - Private `matchmaker_internal` schema; seven RLS-enabled tables.
