@@ -21,7 +21,9 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
     const opts=Array.isArray(sub.options)?sub.options:[];
     const draft=validateDraft(Object.fromEntries(fields.map(k=>[k,option(opts,k)])));
     const preview=await store.prepare(actor,draft);
-    if(!/^[0-9a-f-]{36}$/i.test(String(preview?.token||"")))throw Error("Invalid preview token");
+    if(typeof preview?.token!=="string" ||
+       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(preview.token))
+     throw Error("Invalid preview token");
     const consent=publishingEnabled
       ? "Confirming queues this opt-in listing for PUBLIC posting in #squad-up. Nothing has been posted yet."
       : "Nothing has been posted. Confirming saves a discoverable opt-in listing: other Matchmaker users can see these game preferences with /squad list. No #squad-up post is queued now or later.";
