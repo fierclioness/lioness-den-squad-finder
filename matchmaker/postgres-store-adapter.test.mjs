@@ -46,6 +46,30 @@ test("owner identity, input and token are validated before database access",asyn
  assert.equal(count,0);
  assert.throws(()=>makePostgresMatchmakerStore({}),/query function/);
 });
+test("private SQL adapter refuses coerced or imprecise member identities before every operation",async()=>{
+ let queries=0;
+ const store=makePostgresMatchmakerStore({query:async()=>{queries++;return {rows:[]};}});
+ assert.notEqual(String(Number(actor.memberId)),actor.memberId,
+  "Fixture must demonstrate a lossy Discord snowflake conversion");
+ for(const memberId of [
+  Number(actor.memberId),BigInt(actor.memberId),new String(actor.memberId),
+  {toString:()=>actor.memberId},null,undefined
+ ]){
+  const untrusted={...actor,memberId};
+  for(const operation of [
+   ()=>store.prepare(untrusted,draft),
+   ()=>store.confirm(untrusted,token),
+   ()=>store.cancel(untrusted,token),
+   ()=>store.close(untrusted),
+   ()=>store.mine(untrusted),
+   ()=>store.list(untrusted)
+  ]){
+   await assert.rejects(operation(),/Invalid verified Discord actor/);
+  }
+ }
+ assert.equal(queries,0,"Untrusted actor IDs must never reach private SQL");
+});
+
 test("unavailable database fails closed and no fallback is used",async()=>{
  const store=makePostgresMatchmakerStore({query:async()=>{throw Error("database unavailable");}});
  await assert.rejects(store.claimReplay("1546529501859815438"),/database unavailable/);
