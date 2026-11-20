@@ -1,6 +1,8 @@
 // REVIEW ONLY — one-item private scheduler HTTP gateway, not deployed or enabled.
-// Intended defense-in-depth with Supabase verify_jwt=true PLUS a separate server-side
-// x-matchmaker-scheduler-key; never a Discord app token or account password.
+// Requires a separately reviewed Supabase Edge authentication layer PLUS a
+// server-side x-matchmaker-scheduler-key; never a Discord app token or account password.
+// Supabase verify_jwt=true accepts a valid user JWT, NOT new sb_secret_* API keys.
+// This gateway alone does NOT authenticate the Supabase caller or authorize deployment.
 // Individual workers already gate their own operations. No Discord credentials here.
 // An enabled task must not report another worker's outcome or claim success
 // while its internal feature gate is disabled. Treat mismatches as faults.
