@@ -5,6 +5,11 @@
 import {markerFor} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
+// Discord messages must not inherit invisible direction overrides, alternate
+// line separators, or terminal controls from user-supplied preference fields.
+// CR/LF are normalized below; the remaining controls cannot structure/spoof
+// extra public lines. Emoji and ordinary non-ASCII text remain supported.
+const UNSAFE_LAYOUT=/[\u0000-\u0009\u000B-\u000C\u000E-\u001F\u007F-\u009F\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/u;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 // PostgreSQL bigint listing IDs must also stay exact strings; Number can round
 // an int8 claim and accidentally operate on a different persisted listing.
@@ -22,6 +27,7 @@ function listingToMessage(listing){
  const fields=["game","platform","vibe","mic","timezone","availability"];
  const out=fields.map(k=>{
   if(typeof listing[k]!=="string"||listing[k].length>80||
+     listing[k].trim().length===0||UNSAFE_LAYOUT.test(listing[k])||
      /(?:@everyone|@here|<@|<#|https?:\/\/|discord\.gg)/i.test(listing[k]))
    throw Error("Unsafe listing value");
   return listing[k].replace(/[\r\n]/g," ");
