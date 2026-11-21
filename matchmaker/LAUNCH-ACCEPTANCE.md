@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — private preview/mine/list Markdown and length containment (DRAFT only)
+
+- Added display-only Markdown escaping to voluntary game/availability text in private consent previews, mine, and list responses; all persisted row values are revalidated on read. The private list now fits whole rows within 1,800 code units and explicitly flags omitted entries instead of silently truncating the response at the HTTP boundary's 1,850 limit.
+- New adversarial tests cover spoofed Markdown, emoji preservation, unsafe legacy rows, excessive escaped-row output and a **signed offline HTTP** end-to-end response. This is not actual Discord-client ACK measurement. [Detailed review](../docs/matchmaker-private-response-containment-review-2026-11-21.md).
+- No staging deployment or DB write, Discord message/app/guild/member changes, worker activation, production Den Missions modification, original Squad Finder change or merge. **Client-observed ACK, bot-owned publishing/GET-before-DELETE, scheduler expiry, external security, PR conflicts and explicit release permission still block launch.**
+
+---
+
 ## November 21, 2026 UTC — invisible-text rejection begins at private /squad preview (draft-only, verified)
 
 - Input validation now rejects invisible bidirectional/layout controls before a user-provided game or availability preference enters a private preview or private Matchmaker listing. The public outbox also rejects U+061C/U+FEFF if historical stored values bypass this validator. Accented Unicode and ZWJ emoji remain allowed. [Review details](../docs/matchmaker-private-preview-invisible-text-guard-2026-11-21.md).
