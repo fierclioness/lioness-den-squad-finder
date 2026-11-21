@@ -38,6 +38,28 @@ test("cancel invalidates token, no listing is created",async()=>{
  await assert.rejects(dispatch(click(actor,"mm:confirm:"+token+":private")),/not yours/);
  assert.match((await dispatch(command(actor,"list"))).content,/No active/);
 });
+
+test("case-altered cancel or confirm button actions never trigger storage mutations",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ let confirms=0,cancels=0;
+ const store={
+  prepare:async()=>({token}),
+  confirm:async()=>{confirms++;return {publicPostCreated:false,queuedForPublishing:false};},
+  cancel:async()=>{cancels++;return true;},
+  mine:async()=>null,list:async()=>[],close:async()=>false
+ };
+ const dispatch=makeMatchmakerDispatcher({store});
+ for(const action of ["CANCEL","Cancel","CaNcEl","CONFIRM","Confirm"]){
+  const result=await dispatch(click(actor,"mm:"+action+":"+token+":private"));
+  assert.match(result.content,/Button no longer available/);
+ }
+ assert.equal(confirms,0,"Never convert an alternate-spelled CANCEL into consent");
+ assert.equal(cancels,0,"Invalid button actions must not reach storage");
+ assert.match((await dispatch(click(actor,"mm:cancel:"+token+":private"))).content,/cancelled/);
+ assert.equal(confirms,0);
+ assert.equal(cancels,1,"Normal lowercase cancellation remains available");
+});
+
 test("reject bad guild, missing methods and unsafe draft",async()=>{
  assert.throws(()=>makeMatchmakerDispatcher({store:{}}),/storage adapter/);
  const dispatch=setup();
