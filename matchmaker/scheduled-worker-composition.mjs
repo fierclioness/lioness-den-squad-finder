@@ -1,6 +1,8 @@
 // REVIEW ONLY. Private worker wiring; NOT deployed, scheduled, or authorized for
 // any real Discord guild. Its future Edge endpoint MUST have Supabase
-// verify_jwt=true in addition to this gateway's scheduler secret.
+// authenticate through withSupabase({auth:'secret:den-matchmaker-scheduler'})
+// using verify_jwt=false on the SEPARATE worker function only, then require
+// the independent x-matchmaker-scheduler-key at this gateway.
 // Never import this from the existing public Discord webhook Edge function.
 import {makeScheduledWorkerGateway} from "./scheduled-worker-gateway.mjs";
 import {makeDiscordTransport} from "./discord-transport.mjs";
