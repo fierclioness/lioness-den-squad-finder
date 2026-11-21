@@ -71,6 +71,44 @@ try {
   dispatch:makeMatchmakerDispatcher({store})
  });
  assert.equal((await broken(signed({type:1}))).status,401);
+ // A genuine cross-connection replay race: unlike the in-memory Set tests,
+ // these requests use distinct PostgreSQL sessions and the real primary-key
+ // claimant. Only one signed command may dispatch across concurrent workers.
+ // All identities, signatures and messages below are synthetic; local CI only.
+ const concurrentClients=[];
+ try{
+  for(let i=0;i<6;i++){
+   const contender=new pg.Client({host:process.env.PGHOST,port:Number(process.env.PGPORT||5432),
+    database:process.env.PGDATABASE,user:process.env.PGUSER,password:process.env.PGPASSWORD});
+   await contender.connect();
+   concurrentClients.push(contender);
+   await contender.query("SET ROLE service_role");
+  }
+  let concurrentDispatches=0;
+  const contestedId="1572091972217215999";
+  const attempts=concurrentClients.map(contender=>{
+   const claimantStore=makePostgresMatchmakerStore({query:(sql,params)=>contender.query(sql,params)});
+   const contenderHandler=makeMatchmakerHttpHandler({
+    publicKeyHex,clock:()=>now,enabled:true,allowedTesterIds,
+    claimReplay:claimantStore.claimReplay,
+    dispatch:async()=>{concurrentDispatches++;return {content:"private race winner"};}
+   });
+   // A fresh body stream and authentic signature per delivery, but one
+   // Discord interaction ID; alternate payloads must not bypass deduplication.
+   return contenderHandler(signed({...cmd(member,"list"),id:contestedId}));
+  });
+  const race=await Promise.all(attempts);
+  assert.equal(race.filter(x=>x.status===200).length,1,
+   "Only one real PostgreSQL claimant may accept the signed interaction");
+  assert.equal(race.filter(x=>x.status===401).length,concurrentClients.length-1);
+  assert.equal(concurrentDispatches,1,"No duplicate effects after replay race");
+  const replayRows=(await client.query(
+   "select count(*)::int as n from matchmaker_internal.discord_interaction_replays where interaction_id=$1",
+   [contestedId])).rows[0];
+  assert.equal(replayRows.n,1,"Durable primary key must record exactly one claim");
+ }finally{
+  await Promise.all(concurrentClients.map(c=>c.end()));
+ }
  // Ordinary authenticated role still has no direct access to private tables.
  await client.query("RESET ROLE");
  await client.query("SET ROLE authenticated");
