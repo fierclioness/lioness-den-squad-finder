@@ -38,7 +38,7 @@ try {
     assert.match(payload.content,/Call of Duty/);
     const expected=(await query("select post_reference::text as ref from matchmaker_internal.squad_listings where id=$1::bigint",[listing.listingId])).rows[0].ref;
     assert.match(payload.content,new RegExp("🔎 Den ref: "+expected));
-    return {ok:true,status:200,json:async()=>({id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}})};
+    return {ok:true,status:200,json:async()=>({id:messageId,channel_id:channelId,content:payload.content,author:{id:botUserId,bot:true}})};
   }
  });
  const publisher=makeOutboxWorker({enabled:true,query,sendMessage:transport.sendMessage,channelId,botUserId,
