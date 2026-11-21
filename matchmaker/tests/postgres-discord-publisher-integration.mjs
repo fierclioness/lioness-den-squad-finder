@@ -27,7 +27,7 @@ try {
  const again=await query("select matchmaker_internal.enqueue_post($1::bigint) as queued",[listing.listingId]);
  assert.equal(again.rows[0].queued,false);
  const channelId="1546529497925296199",botUserId="1546529501859815439",messageId="1546529501859815438";
- let apiCalls=0;
+ let apiCalls=0,postedReference=null;
  const transport=makeDiscordTransport({enabled:true,
   botToken:"testing-only-not-real-token-0123456",channelId,botUserId,
   fetchFn:async(url,options)=>{
@@ -38,6 +38,7 @@ try {
     assert.match(payload.content,/Call of Duty/);
     const expected=(await query("select post_reference::text as ref from matchmaker_internal.squad_listings where id=$1::bigint",[listing.listingId])).rows[0].ref;
     assert.match(payload.content,new RegExp("🔎 Den ref: "+expected));
+    postedReference=expected;
     return {ok:true,status:200,json:async()=>({id:messageId,channel_id:channelId,content:payload.content,author:{id:botUserId,bot:true}})};
   }
  });
@@ -83,7 +84,8 @@ try {
    assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages/"+messageId);
    deleteMethods.push(init.method);
    return init.method==="GET"?
-    {status:200,json:async()=>({id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}})}:
+    {status:200,json:async()=>({id:messageId,channel_id:channelId,author:{id:botUserId,bot:true},
+       content:"🔎 Den ref: "+postedReference})}:
     {status:204};
   }
  });
