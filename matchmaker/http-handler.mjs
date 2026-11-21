@@ -104,9 +104,13 @@ export function makeMatchmakerHttpHandler({publicKeyHex,claimReplay,dispatch,ena
      data:interaction.data
    });
    // Dispatch may respond ONLY with ephemeral messages. It must never control flags.
-   if(!result || typeof result.content!=="string")
-    return json(ephemeral("Matchmaker couldn't complete that action."));
-   const output=ephemeral(result.content.slice(0,1850));
+   // Never silently trim bot-authored consent or listing text. In particular,
+   // an oversized preview must not retain actionable Confirm buttons after
+   // its disclosure text has been cut off. Fail closed with no components.
+   if(!result || typeof result.content!=="string" ||
+      result.content.length===0 || result.content.length>1850)
+    return json(ephemeral("Matchmaker couldn't safely display that response. Please create a fresh request."));
+   const output=ephemeral(result.content);
    // Only a tightly validated ephemeral Confirm/Cancel row is allowed.
    // Never pass untrusted component data through from a dispatcher.
    if(Array.isArray(result.buttons) && result.buttons.length===2 &&
