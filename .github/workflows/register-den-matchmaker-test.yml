@@ -15,10 +15,13 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/den-matchmaker-mvp-2026-11-18
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Register command for Den Matchmaker Test app ONLY
+      - name: Register /squad for test app and test guild ONLY
         env:
           DEN_MATCHMAKER_TEST_BOT_TOKEN: ${{ secrets.DEN_MATCHMAKER_TEST_BOT_TOKEN }}
         run: |
