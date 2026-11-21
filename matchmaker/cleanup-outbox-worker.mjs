@@ -53,7 +53,8 @@ export function makeCleanupOutboxWorker({
    const rec=await call(
     "select c.listing_id,c.message_id,c.channel_id,c.bot_user_id, "+
     "r.discord_message_id as receipt_message_id,r.channel_id as receipt_channel_id, "+
-    "r.bot_user_id as receipt_bot_user_id,s.status as listing_status,s.expires_at "+
+    "r.bot_user_id as receipt_bot_user_id,s.status as listing_status,s.expires_at, "+
+    "s.post_reference::text as post_reference "+
     "from matchmaker_internal.cleanup_outbox c "+
     "join matchmaker_internal.squad_listings s on s.id=c.listing_id "+
     "left join matchmaker_internal.post_receipts r on r.listing_id=c.listing_id "+
@@ -65,6 +66,7 @@ export function makeCleanupOutboxWorker({
    const safe=rec&&exactListingId(rec.listing_id)&&rec.listing_id===listingId&&inactive &&
      exactSnow(rec.message_id) &&
      rec.message_id===rec.receipt_message_id &&
+     typeof rec.post_reference==="string" && UUID.test(rec.post_reference) &&
      rec.channel_id===channelId && rec.receipt_channel_id===channelId &&
      rec.bot_user_id===botUserId && rec.receipt_bot_user_id===botUserId;
    if(!safe){
@@ -72,8 +74,9 @@ export function makeCleanupOutboxWorker({
     return {status:"quarantined",listingId};
    }
    // The verifiedCleanup transport separately GETs this exact original
-   // message and checks immutable ID/channel/bot authorship before DELETE.
-   const removal=await verifiedCleanup.remove(rec.message_id);
+   // message and checks immutable ID/channel/bot authorship AND the unique
+   // persisted listing reference in the message content before DELETE.
+   const removal=await verifiedCleanup.remove(rec.message_id,rec.post_reference);
    if(!["deleted","already_absent"].includes(removal?.status))
     throw Error("Discord deletion outcome not verified");
    confirmedAbsent=true;
