@@ -69,3 +69,15 @@ test("opt-in draft validation rejects invisible direction/layout controls but pr
  assert.equal(valid.game,"Pokémon 🎮");
  assert.equal(valid.availability,"Co-op 👩‍💻 on Saturday");
 });
+
+// private response Markdown and size safety: the ephemeral opt-in preview must
+// not render voluntary game or availability text as bot-authored formatting.
+test("private preview escapes Markdown layout while retaining user text and emoji",()=>{
+ const injected={...draft,game:"**Winner** [join](spoof) 🎮",availability:"||hidden|| #urgent"};
+ const preview=formatPreview(injected);
+ assert.match(preview,/\\\*\\\*Winner\\\*\\\*/);
+ assert.match(preview,/\\\[join\\\]\\\(spoof\\\)/);
+ assert.match(preview,/\\\|\\\|hidden\\\|\\\|/);
+ assert.match(preview,/🎮/);
+ assert.match(preview,/Only|only/);
+});
