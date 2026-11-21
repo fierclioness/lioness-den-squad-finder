@@ -14,7 +14,7 @@ test("enabled transport uses fixed channel and forces zero allowed mentions",asy
  const t=makeDiscordTransport({botToken:token,channelId,botUserId,enabled:true,
   fetchFn:async(url,init)=>{
    calls.push({url,init});
-   return {ok:true,status:200,json:async()=>({id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}})};
+   return {ok:true,status:200,json:async()=>({id:"1546529501859815438",channel_id:channelId,content:"🎮 Call of Duty — Casual",author:{id:botUserId,bot:true}})};
   }});
  const result=await t.sendMessage({content:"🎮 Call of Duty — Casual",allowed_mentions:{parse:[]}});
  assert.deepEqual(result,{confirmed:true,messageId:"1546529501859815438",channelId,botUserId});
@@ -107,5 +107,25 @@ test("only HTTP 200 with a verified receipt confirms publication; other 2xx resp
    transport.sendMessage({content:"Test-only squad message",allowed_mentions:{parse:[]}}),
    /Delivery not confirmed/);
   assert.equal(attempts,1,"Ambiguous success codes must not trigger retries");
+ }
+});
+
+// A 200 reply with a valid original-bot identity but wrong message body
+// cannot prove this opt-in listing was posted; no retry is allowed.
+test("HTTP 200 receipt rejects mismatched or missing message content",async()=>{
+ for(const receiptContent of [undefined,null,"","Another listing",42]){
+  let sends=0;
+  const t=makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,
+   fetchFn:async()=>{
+    sends++;
+    return {ok:true,status:200,json:async()=>({
+     id:"1546529501859815438",channel_id:channelId,
+     ...(receiptContent===undefined?{}:{content:receiptContent}),
+     author:{id:botUserId,bot:true}
+    })};
+   }
+  });
+  await assert.rejects(t.sendMessage({content:"Exact listing",allowed_mentions:{parse:[]}}),/Untrusted delivery receipt/);
+  assert.equal(sends,1,"Never retry an ambiguous POST receipt");
  }
 });
