@@ -1,3 +1,12 @@
+## November 20, 2026 — draft-only Unicode layout spoofing guard (verified November 21 UTC)
+
+- Public outbox bot messages now reject Unicode bidi overrides/isolates, non-ASCII line separators, control characters and blank-only fields before any Discord POST; CR/LF runs collapse to one space and normal accented/emoji text remains usable. Two adversarial regressions validate no send + one quarantine for unsafe input, and safe Unicode formatting.
+- [Review and reproducer](../docs/matchmaker-outbox-layout-control-safety-2026-11-20.md). Final code/test `e1725c4`: **236/236 Node PASS**, [core workflow](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44853337614); [Edge/hosted negative HTTP PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44853337563); [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44853337568). Initial test formatting mismatch corrected before final full-green verification.
+- Isolated staging remained Edge v18 ACTIVE with one listing/preview, nine replays, zero post/cleanup/receipt/audit rows. No deployment, DB writes, public messages, Discord guild/app/member changes, production Den Missions edits or manual Squad Finder modifications.
+- **Launch remains blocked:** real Discord-client ACK timing, separately authorized original-bot POST/GET-before-DELETE cleanup, scheduler/expiry E2E, independent security review, unresolved PR merge conflicts and explicit launch approval. Draft PR #2 stays unmerged.
+
+---
+
 ## November 20, 2026 — conservative tail-latency headroom gate (review-only)
 
 - The offline `evaluateTimingSamples` release aid previously treated p95 below 2,000 ms plus any maximum below 3,000 ms as meeting the local budget. A batch of 19 fast responses + one 2,450 ms response could therefore be incorrectly labeled `withinLocalBudget=true`. It now exposes separate p95 and Discord-deadline facts and requires **every** sample to be below the local headroom budget before the local-budget verdict is green.
