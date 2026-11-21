@@ -8,8 +8,10 @@ export const ZONES = Object.freeze(["ET","CT","MT","PT","AT","UK","CET/CEST","UT
 const SNOWFLAKE = /^\d{15,22}$/;
 // Reject invisible control/direction marks before preview or storage so
 // private /squad responses cannot be visually impersonated by user text.
+// Block invisible soft hyphen/zero-width space/word joiner and grapheme controls
+// that could hide extra text in a preference; retain ZWJ for emoji sequences.
 // Keep ordinary Unicode, accents and emoji (including ZWJ sequences) valid.
-const INVISIBLE_LAYOUT = /[\u0080-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/u;
+const INVISIBLE_LAYOUT = /[\u0080-\u009f\u00ad\u034f\u061c\u180e\u200b\u200e\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u;
 
 function plain(value, max) {
   if (typeof value !== "string") throw new Error("Invalid text");
