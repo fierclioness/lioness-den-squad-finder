@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — exact-case consent-button action guard (DRAFT only)
+
+- Closed a case-mismatch path: the prior case-insensitive custom-ID matcher accepted uppercase/mixed-case `CANCEL`, but a case-sensitive cancellation branch would execute confirmation instead. Dispatcher now requires exact lowercase action/token/mode; unrecognized variants cause an ephemeral **no-action** response. Legitimate lowercase Cancel still works. [Security review](../docs/matchmaker-consent-action-case-safety-2026-11-21.md).
+- New direct dispatcher and **signed offline HTTP** regressions confirm altered-case CANCEL does not create a listing or consume the original preview. Code/tests commit `8a29d237`: [Node PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44909481715), [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44909481716), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44909481725).
+- Read-only isolated staging v18 still has 1 listing/preview, 9 replays, and zero publish/cleanup/receipt/audit rows. **No merge, deployment, DB write, Discord configuration/command/public message/member change, Den Missions production change or manual Squad Finder change.** This offline test is not real client-observed ACK. Launch remains blocked on separately approved bot-owned post/verified cleanup, scheduler expiry E2E, independent security review and explicit release authorization.
+
+---
+
 ## November 21, 2026 UTC — signed preview output truncation fail-closed (DRAFT only)
 
 - Previous signed HTTP adapter silently sliced overlong dispatcher text at 1,850 characters but retained actionable Confirm/Cancel components. This could conceal opt-in public-post disclosures in a future overlong preview. It now returns an **ephemeral, no-buttons fallback** for empty/overlong content; exact 1,850-character responses remain unchanged. [Security review](../docs/matchmaker-signed-preview-truncation-safety-2026-11-21.md).
