@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — invisible word-break controls fail closed (DRAFT, not deployed)
+
+- Private opt-in preview/storage and public bot-post boundaries now both reject U+200B, U+2060, U+00AD, U+034F and U+180E. This prevents visually concealed text in a game or availability preference while preserving accented text and ZWJ emoji. Existing stored rows must pass the public gate before any mocked POST. [Reproducible review](../docs/matchmaker-invisible-word-break-preferences-2026-11-21.md).
+- **244/244 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44878296388)); [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44878296349); [disposable Postgres PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44878296414) at code/test `81febc7565`. Read-only staging Edge v18, 1 listing, 1 preview, 9 replays, 0 post/cleanup/receipt/audit rows.
+- No deployment, staging writes, Discord app/guild/member edits, public posts, production Den Missions or original manual Squad Finder changes. **Still NOT launch-ready:** actual Discord-client ACK, separately approved bot-owned posting + GET-before-DELETE cleanup, scheduler expiry, independent security review, PR mergeability and explicit release approval remain gated.
+
+---
+
 ## November 21, 2026 UTC — private preview/mine/list Markdown and length containment (DRAFT only)
 
 - Added display-only Markdown escaping to voluntary game/availability text in private consent previews, mine, and list responses; all persisted row values are revalidated on read. The private list now fits whole rows within 1,800 code units and explicitly flags omitted entries instead of silently truncating the response at the HTTP boundary's 1,850 limit.
