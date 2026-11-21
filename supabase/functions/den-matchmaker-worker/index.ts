@@ -8,7 +8,7 @@ const disabled=()=>Response.json({status:"disabled"},{
 });
 // Supabase's documented Edge wrapper uses the default exported fetch handler.
 export default {
- fetch:withSupabase({auth:"secret:den-matchmaker-scheduler"},async()=>{
+ fetch:withSupabase({auth:"secret:den_matchmaker_scheduler"},async()=>{
   return disabled();
  })
 };
