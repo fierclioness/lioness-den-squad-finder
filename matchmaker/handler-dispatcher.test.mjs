@@ -79,6 +79,23 @@ test("cancelled preview never confirms and wrong guild cannot dispatch",async()=
  assert.match(wrong.data.content,/only/i);
 });
 
+
+test("signed case-altered CANCEL cannot silently confirm an opted-in listing",async()=>{
+ const handle=system();
+ const options=Object.entries(draft).map(([name,value])=>({name,value}));
+ const preview=await (await handle(request(cmd(member,"create",options)))).json();
+ const cancelId=preview.data.components[0].components[1].custom_id;
+ const altered=cancelId.replace("mm:cancel:","mm:CANCEL:");
+ const response=await (await handle(request(button(member,altered)))).json();
+ assert.equal(response.data.flags,64);
+ assert.match(response.data.content,/Button no longer available/);
+ assert.match((await (await handle(request(cmd(member,"list")))).json()).data.content,/No active listings/);
+ // The unmodified cancel button remains usable, proving no confirmation consumed the preview.
+ const cancelled=await (await handle(request(button(member,cancelId)))).json();
+ assert.match(cancelled.data.content,/cancelled/);
+ assert.match((await (await handle(request(cmd(member,"list")))).json()).data.content,/No active listings/);
+});
+
 test("concurrent identical signed interaction is dispatched exactly once",async()=>{
  const handle=system();
  const request1=request(cmd(member,"list"));
