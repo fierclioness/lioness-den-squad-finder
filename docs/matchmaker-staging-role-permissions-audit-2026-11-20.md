@@ -21,3 +21,8 @@ Date: 2026-11-20. Source: **read-only SQL against isolated staging project** `tc
 - Only after authentication-only deployment is verified should a separate maintenance-worker design be reviewed.
 
 This evidence is not permission to deploy, enable scheduler, post, delete, or migrate.
+
+## Follow-up read-only function security check (Nov 21, 2026)
+- All **20** private SQL functions are `SECURITY INVOKER` (`prosecdef=false`); **0** are `SECURITY DEFINER`.
+- This does not make a privileged service-role connection least-privileged: an invoker running as `service_role` retains that role's broad grants.
+- No grants or database functions were changed during this verification.
