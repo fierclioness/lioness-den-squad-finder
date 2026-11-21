@@ -31,3 +31,11 @@ test("JWT bypass is scoped only to the named-secret worker, never the Discord we
  assert.doesNotMatch(config,/\[functions\.den-matchmaker\]/);
  assert.equal((config.match(/verify_jwt\s*=\s*false/g)||[]).length,1);
 });
+
+test("worker must not broaden authentication or silently gain privileged capabilities",()=>{
+ assert.doesNotMatch(source,/auth\s*:\s*["'](?:none|secret|publishable|user)["']/);
+ assert.doesNotMatch(source,/auth\s*:\s*\[/);
+ assert.doesNotMatch(source,/supabaseAdmin|service_role|SUPABASE_SECRET_KEYS|SUPABASE_DB_URL/);
+ assert.doesNotMatch(source,/x-matchmaker-scheduler-key|makeMaintenanceWorker|makeOutboxWorker|makeCleanupOutboxWorker/);
+ assert.equal((source.match(/secret:den-matchmaker-scheduler/g)||[]).length,1);
+});
