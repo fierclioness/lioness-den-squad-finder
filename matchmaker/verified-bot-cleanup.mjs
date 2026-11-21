@@ -1,6 +1,7 @@
 // Development-only verified cleanup transport. Never enabled in production here.
 // Verifies original bot ownership through Discord GET before deleting a fixed-channel post.
 import {authorizeReceiptCleanup} from "./receipt-authorization.mjs";
+import {markerFor,verifyReferenceMatch} from "./listing-reference.mjs";
 const SNOW=/^\d{15,22}$/;
 // Discord snowflakes are opaque decimal strings, not safe JS numbers.
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
@@ -18,9 +19,13 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
  if(enabled && (typeof botToken!=="string"||botToken.length<20||
      !exactSnow(botUserId)||!exactSnow(channelId)))
    throw Error("Trusted bot identity and fixed destination required");
- async function remove(messageId){
+ async function remove(messageId,expectedReference){
    if(!enabled)throw Error("Verified cleanup is disabled");
    if(!exactSnow(messageId))throw Error("Invalid original message receipt");
+   // A bot may post many unrelated messages in the same channel. Never DELETE
+   // merely because a ledger points to a message authored by the right bot.
+   // Require the unique, persisted listing marker before any Discord GET.
+   markerFor(expectedReference);
    const url="https://discord.com/api/v10/channels/"+channelId+"/messages/"+messageId;
    const headers={authorization:"Bot "+botToken};
    // Do not delete without reading the precise original and proving authorship.
@@ -37,8 +42,9 @@ export function makeVerifiedBotCleanup({botToken,botUserId,channelId,fetchFn=fet
       receipt:{messageId,channelId,botUserId},
       expected:{channelId,botUserId},
       observedMessage:{id:message?.id,channelId:message?.channel_id,authorId:message?.author?.id}
-    })||message?.author?.bot!==true)
-      throw Error("Original message was not verified as our bot's post");
+    })||message?.author?.bot!==true||
+      !verifyReferenceMatch(expectedReference,message?.content))
+      throw Error("Original message was not verified as this listing's bot post");
    // A timed-out DELETE is ambiguous. Never declare success without a 204/404 receipt.
    const removal=await fetchFn(url,{method:"DELETE",headers,redirect:"error",signal:AbortSignal.timeout(requestTimeoutMs)});
    if(removal.redirected===true)throw Error("Redirected Discord deletion is unconfirmed");
