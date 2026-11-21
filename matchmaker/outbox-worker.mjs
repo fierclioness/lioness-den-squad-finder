@@ -30,7 +30,11 @@ function listingToMessage(listing){
      listing[k].trim().length===0||UNSAFE_LAYOUT.test(listing[k])||
      /(?:@everyone|@here|<@|<#|https?:\/\/|discord\.gg)/i.test(listing[k]))
    throw Error("Unsafe listing value");
-  return listing[k].replace(/[\r\n]+/g," ");
+  // Render preferences as plain text: never let a voluntary field become
+  // a Discord heading, spoiler, quote, formatted announcement or clickable
+  // Markdown label. Keep the bot-owned message layout authoritative.
+  const normalized=listing[k].replace(/[\r\n]+/g," ");
+  return normalized.replace(/([\\`*_~|>#\[\]()!])/g,"\\$1");
  });
  const reference=markerFor(listing.post_reference);
  return "👑 **Looking for a squad?**\n🎮 "+out[0]+"\n"+
