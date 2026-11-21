@@ -14,7 +14,7 @@ test("enabled transport uses fixed channel and forces zero allowed mentions",asy
  const t=makeDiscordTransport({botToken:token,channelId,botUserId,enabled:true,
   fetchFn:async(url,init)=>{
    calls.push({url,init});
-   return {ok:true,json:async()=>({id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}})};
+   return {ok:true,status:200,json:async()=>({id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}})};
   }});
  const result=await t.sendMessage({content:"🎮 Call of Duty — Casual",allowed_mentions:{parse:[]}});
  assert.deepEqual(result,{confirmed:true,messageId:"1546529501859815438",channelId,botUserId});
@@ -29,7 +29,7 @@ test("enabled transport uses fixed channel and forces zero allowed mentions",asy
 test("rejects invalid destination, mass mentions and fake receipts",async()=>{
  assert.throws(()=>makeDiscordTransport({enabled:true,botToken:token,channelId:"not-a-snowflake"}),/credentials/);
  const t=makeDiscordTransport({enabled:true,botToken:token,channelId,botUserId,
-  fetchFn:async()=>({ok:true,json:async()=>({id:"1546529501859815438",channel_id:"999999999999999999"})})});
+  fetchFn:async()=>({ok:true,status:200,json:async()=>({id:"1546529501859815438",channel_id:"999999999999999999"})})});
  await assert.rejects(t.sendMessage({content:"@everyone",allowed_mentions:{parse:[]}}),/mention/);
  await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:["users"]}}),/Mentions/);
  await assert.rejects(t.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/receipt/);
@@ -64,7 +64,7 @@ test("redirected Discord REST reply cannot confirm a public post",async()=>{
   fetchFn:async(_url,init)=>{
    calls++;
    assert.equal(init.redirect,"error");
-   return {ok:true,redirected:true,json:async()=>({
+   return {ok:true,status:200,redirected:true,json:async()=>({
     id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}
    })};
   }});
@@ -89,9 +89,23 @@ test("numeric Discord snowflakes and non-string receipts fail closed before trus
   let attempts=0;
   const transport=makeDiscordTransport({
    enabled:true,botToken:token,channelId,botUserId,
-   fetchFn:async()=>{attempts++;return {ok:true,json:async()=>fakeReceipt};}
+   fetchFn:async()=>{attempts++;return {ok:true,status:200,json:async()=>fakeReceipt};}
   });
   await assert.rejects(transport.sendMessage({content:"safe",allowed_mentions:{parse:[]}}),/Untrusted delivery receipt/);
   assert.equal(attempts,1,"Do not retry when the receipt identity is ambiguous");
+ }
+});
+
+test("only HTTP 200 with a verified receipt confirms publication; other 2xx responses are uncertain",async()=>{
+ const message={id:"1546529501859815438",channel_id:channelId,author:{id:botUserId,bot:true}};
+ for(const status of [201,202,204,206]){
+  let attempts=0;
+  const transport=makeDiscordTransport({botToken:token,channelId,botUserId,enabled:true,
+   fetchFn:async()=>{attempts++;return {ok:true,status,json:async()=>message};}
+  });
+  await assert.rejects(
+   transport.sendMessage({content:"Test-only squad message",allowed_mentions:{parse:[]}}),
+   /Delivery not confirmed/);
+  assert.equal(attempts,1,"Ambiguous success codes must not trigger retries");
  }
 });
