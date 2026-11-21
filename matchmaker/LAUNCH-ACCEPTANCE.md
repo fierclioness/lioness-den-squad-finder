@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — isolated hosted Edge v18 latency baseline (READ-ONLY; NOT ACK CERTIFICATION)
+
+- Read-only previous-24h Supabase `function_edge_logs` for isolated staging Edge **v18**: eight POST HTTP 200 samples (mean execution 230.8 ms, p95 406.05 ms, max 433 ms); 122 POST 401 denials and 117 GET /health responses tracked separately. These are **server execution times**, not client-observed initial ACK timing. Access logs cannot distinguish PING versus /squad among the eight successful POSTs. [Reproducible evidence and limits](../docs/matchmaker-v18-hosted-edge-latency-evidence-2026-11-21.md).
+- Isolated staging read-only inventory: one listing, one preview, nine replay records, **zero** post/cleanup jobs, receipts, reconciliation; Edge v18 ACTIVE with no separate worker deployed. Seven informational private-table RLS/no-policy advisories, two unused-index advisories; no DB writes, deployment, Discord app/guild/member changes, public posts/deletions or changes to original manual Squad Finder. **Production Den Missions not accessed.**
+- **NOT launch-ready:** require separately authorized real Discord-client /squad ACK under three seconds and headroom evidence; independently approved original-bot controlled POST and reference-bound GET-before-DELETE; authenticated scheduler/expiry E2E; independent security review; explicit release authorization. Keep PR #2 draft/unmerged; commands/posting/scheduler OFF.
+
+---
+
 ## November 21, 2026 UTC — original-listing marker required before any Discord DELETE (DRAFT ONLY)
 
 - Security gap closed in both durable and legacy cleanup paths: matching original-bot/channel/message IDs alone could point at an unrelated post from the same bot. GET-before-DELETE now additionally requires exactly one matching **persisted random listing reference marker** in Discord's fetched content; missing, foreign and duplicated markers fail closed without DELETE. A malformed persisted marker cannot trigger a GET. [Review and limits](../docs/matchmaker-cleanup-reference-binding-review-2026-11-21.md).
