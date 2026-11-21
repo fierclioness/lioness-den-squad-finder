@@ -134,3 +134,44 @@ test("storage preview tokens must be primitive UUID strings before creating cons
  assert.deepEqual(accepted.buttons.map(b=>b.token),[valid,valid]);
  assert.equal(stores,7);
 });
+
+// private response Markdown and size safety: rows must not impersonate
+// bot-authored text or be silently sliced by the signed HTTP adapter.
+test("mine and list escape user Markdown in private output",async()=>{
+ const dispatch=setup();
+ const marked={...draft,game:"**Team** [join](spoof) 🎮",availability:"||spoiler|| #urgent"};
+ const opts=Object.entries(marked).map(([name,value])=>({name,value}));
+ const preview=await dispatch(command(actor,"create",opts));
+ assert.match(preview.content,/\\\*\\\*Team\\\*\\\*/);
+ await dispatch(click(actor,"mm:confirm:"+preview.buttons[0].token+":private"));
+ for(const name of ["mine","list"]){
+  const text=(await dispatch(command(actor,name))).content;
+  assert.match(text,/\\\*\\\*Team\\\*\\\*/);
+  if(name==="list")assert.match(text,/\\\|\\\|spoiler\\\|\\\|/);
+  assert.doesNotMatch(text,/\n.*\n.*#urgent/);
+ }
+});
+test("list explicitly notes omissions rather than truncating long escaped rows",async()=>{
+ const long={...draft,game:"*".repeat(55),availability:"_".repeat(70)};
+ const store={
+  prepare:async()=>{throw Error("not called");},confirm:async()=>null,
+  cancel:async()=>false,mine:async()=>null,close:async()=>false,
+  list:async()=>Array.from({length:10},()=>({...long}))
+ };
+ const dispatch=makeMatchmakerDispatcher({store});
+ const result=await dispatch(command(actor,"list"));
+ assert.ok(result.content.length<=1800,"Response must fit the private HTTP adapter budget");
+ assert.match(result.content,/Additional listings omitted to fit the response limit\.$/);
+ assert.match(result.content,/\\\*\\\*\\\*/);
+ assert.ok(result.content.split("\n").length<12,"Oversized list should omit whole rows");
+});
+test("invalid legacy stored rows fail closed in mine and list",async()=>{
+ const invalid={...draft,game:"Trusted\u202eFake notice"};
+ const store={
+  prepare:async()=>null,confirm:async()=>null,cancel:async()=>false,
+  close:async()=>false,mine:async()=>invalid,list:async()=>[invalid]
+ };
+ const dispatch=makeMatchmakerDispatcher({store});
+ await assert.rejects(dispatch(command(actor,"mine")),/Unsafe invisible/);
+ await assert.rejects(dispatch(command(actor,"list")),/Unsafe invisible/);
+});
