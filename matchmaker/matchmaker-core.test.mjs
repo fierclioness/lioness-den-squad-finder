@@ -60,8 +60,8 @@ test("offline listing ownership never rounds numeric or object-coerced Discord I
 
 // Reject layout spoofing at the earliest opt-in validation boundary, including
 // private /squad preview and list (not only the later public post worker).
-test("opt-in draft validation rejects invisible direction/layout controls but preserves emoji",()=>{
- for(const hidden of ["\u202e","\u2066","\u0085","\u061c","\ufeff","\u2028","\u2029"]){
+test("opt-in draft validation rejects invisible direction/layout and word-split controls but preserves emoji",()=>{
+ for(const hidden of ["\u202e","\u2066","\u0085","\u061c","\ufeff","\u2028","\u2029","\u200b","\u2060","\u00ad","\u034f","\u180e"]){
   assert.throws(()=>validateDraft({...draft,game:"Team"+hidden+"moderator"}),/Unsafe invisible/);
   assert.throws(()=>validateDraft({...draft,availability:"Tonight"+hidden+"urgent"}),/Unsafe invisible/);
  }
