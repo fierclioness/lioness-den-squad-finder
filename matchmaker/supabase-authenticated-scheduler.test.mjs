@@ -6,7 +6,7 @@ test("named Supabase secret is mandatory and worker remains OFF by default",asyn
  let mode,work=0;
  const withSupabase=(options,callback)=>{mode=options.auth;return callback;};
  const handler=makeSupabaseAuthenticatedScheduler({withSupabase,gateway:async()=>{work++;return Response.json({ok:true})}});
- assert.equal(mode,"secret:den-matchmaker-scheduler");
+ assert.equal(mode,"secret:den_matchmaker_scheduler");
  assert.equal(SCHEDULER_AUTH_MODE,mode);
  const response=await handler(request(),{authMode:"secret"});
  assert.equal(response.status,503);assert.equal(work,0);
