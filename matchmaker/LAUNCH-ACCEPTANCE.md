@@ -1,3 +1,10 @@
+## November 21, 2026 UTC — draft PR merge conflict CLEARED, no merge performed
+
+- Safely synchronized the draft manual test-command registration workflow with `main`'s more guarded version: pinned test feature-branch checkout, `persist-credentials:false`, explicit typed `REGISTER_TEST_ONLY` dispatch gate. File source/target SHA independently matched. **GitHub now reports draft PR #2 mergeable:true, merged:false** after prior mergeable:false. [Review](../docs/matchmaker-pr-mergeability-guarded-workflow-review-2026-11-21.md); commit `9ae80f6e`.
+- No workflow dispatch, command registration, bot/guild settings changes, public messages, staging writes, production Den Missions changes, original manual Squad Finder edits or PR merge. Conflict resolution is **not** launch permission. Real Discord-client ACK latency, separately approved bot-owned POST/GET-before-DELETE, authenticated scheduler/expiry E2E, independent security review and explicit release approval remain open.
+
+---
+
 ## November 21, 2026 UTC — exact Discord POST content receipt (DRAFT ONLY, verified)
 
 - Guarded Discord transport now requires exact returned message `content` in addition to HTTP 200, original-bot and fixed-channel/message identifiers before confirming public opt-in listing delivery. Mismatched/missing body remains UNCERTAIN, **not retried** (Discord may normalize/strip characters). Five adversarial response variants covered. [Review](../docs/matchmaker-discord-post-content-receipt-gate-2026-11-21.md).
