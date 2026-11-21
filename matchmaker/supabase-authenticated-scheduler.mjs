@@ -5,7 +5,7 @@
 // function, and withSupabase performs named-secret authentication instead.
 // Reference: https://supabase.com/docs/guides/functions/auth
 import {makeAuthenticatedSchedulerAdapter} from "./authenticated-scheduler-adapter.mjs";
-const NAME="den-matchmaker-scheduler";
+const NAME="den_matchmaker_scheduler";
 export const SCHEDULER_AUTH_MODE="secret:"+NAME;
 export function makeSupabaseAuthenticatedScheduler({withSupabase,gateway,enabled=false}={}){
  if(typeof withSupabase!=="function")throw Error("Trusted Supabase auth wrapper required");
