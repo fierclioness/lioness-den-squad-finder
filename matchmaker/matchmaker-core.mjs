@@ -25,6 +25,12 @@ function choose(value, options) {
   if (!options.includes(value)) throw new Error("Invalid selection");
   return value;
 }
+// Also protect private Discord previews: the trusted bot template must not be
+// re-styled as a heading, spoiler, hyperlink or code block by a preference.
+export function escapeDiscordDisplay(value) {
+  if (typeof value !== "string") throw new Error("Invalid display value");
+  return value.replace(/([\\`*_~|>#\[\]()!])/g, "\\$1");
+}
 export function validateDraft(draft) {
   if (!draft || typeof draft !== "object") throw new Error("Invalid draft");
   return {
@@ -65,11 +71,11 @@ export function formatPreview(listing,{publishingEnabled=false}={}) {
   const d = validateDraft(listing);
   return [
     "👑 THE LIONESS DEN | SQUAD MATCHMAKER",
-    "🎮 Game: " + d.game,
-    "🕹️ Platform: " + d.platform,
-    "✨ Vibe: " + d.vibe,
-    "🎧 Mic: " + d.mic,
-    "🕒 Availability: " + d.availability + " (" + d.timezone + ")",
+    "🎮 Game: " + escapeDiscordDisplay(d.game),
+    "🕹️ Platform: " + escapeDiscordDisplay(d.platform),
+    "✨ Vibe: " + escapeDiscordDisplay(d.vibe),
+    "🎧 Mic: " + escapeDiscordDisplay(d.mic),
+    "🕒 Availability: " + escapeDiscordDisplay(d.availability) + " (" + escapeDiscordDisplay(d.timezone) + ")",
     "",
     publishingEnabled
       ? "Only after you confirm, the bot may post this request in #squad-up. No pressure, no automatic DMs. 💕"
