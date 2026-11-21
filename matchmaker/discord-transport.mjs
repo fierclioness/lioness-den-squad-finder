@@ -40,8 +40,10 @@ export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch
   if(response.status!==200 || response.ok!==true)throw Error("Delivery not confirmed");
   let data;
   try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
+  // A matching bot/channel receipt alone cannot prove the intended listing
+  // was published. Refuse a mismatched or missing returned message body.
   if(!data || !exactSnow(data.id) || data.channel_id!==channelId||
-      data.author?.id!==botUserId||data.author?.bot!==true)
+      data.content!==content || data.author?.id!==botUserId||data.author?.bot!==true)
    throw Error("Untrusted delivery receipt");
   return {confirmed:true,messageId:String(data.id),channelId:String(data.channel_id),botUserId:String(data.author.id)};
  }
