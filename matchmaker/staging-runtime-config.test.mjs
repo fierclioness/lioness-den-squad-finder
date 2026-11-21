@@ -3,12 +3,29 @@ import assert from "node:assert/strict";
 import {resolvePrivateDatabaseUrl} from "./staging-runtime-config.mjs";
 const read=values=>key=>values[key];
 test("staging uses Supabase's automatic server-only DB URL",()=>{
- const url="postgresql://not-a-real-user:placeholder@staging.internal/postgres";
+ const url="postgresql://postgres:placeholder@db.tcxktyqywsqafnyxhpgy.supabase.co/postgres";
  assert.equal(resolvePrivateDatabaseUrl(read({
   SUPABASE_URL:"https://tcxktyqywsqafnyxhpgy.supabase.co",
   SUPABASE_DB_URL:url
  })),url);
 });
+
+test("unattributed automatic Supabase database URLs fail closed, while scoped staging remains usable",()=>{
+ const origin="https://tcxktyqywsqafnyxhpgy.supabase.co";
+ for(const url of [
+  "postgresql://postgres:placeholder@staging.internal/postgres",
+  "postgresql://postgres:placeholder@production.internal/postgres",
+  "postgresql://proxy:placeholder@private.internal/postgres?sslmode=require",
+  "postgresql://proxy:placeholder@localhost:5432/postgres",
+  "postgresql://postgres:placeholder@db.abcdefghijklmnopqrst.supabase.co/postgres"
+ ]){
+  assert.equal(resolvePrivateDatabaseUrl(read({SUPABASE_URL:origin,SUPABASE_DB_URL:url})),"",
+   "Implicit fallback must not trust an opaque host or another project");
+ }
+ const scoped="postgresql://postgres.tcxktyqywsqafnyxhpgy:placeholder@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require";
+ assert.equal(resolvePrivateDatabaseUrl(read({SUPABASE_URL:origin,SUPABASE_DB_URL:scoped})),scoped);
+});
+
 test("the production Den Missions project must not inherit default privileged DB URL",()=>{
  const url="postgresql://not-a-real-user:placeholder@production.internal/postgres";
  assert.equal(resolvePrivateDatabaseUrl(read({
