@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — signed preview output truncation fail-closed (DRAFT only)
+
+- Previous signed HTTP adapter silently sliced overlong dispatcher text at 1,850 characters but retained actionable Confirm/Cancel components. This could conceal opt-in public-post disclosures in a future overlong preview. It now returns an **ephemeral, no-buttons fallback** for empty/overlong content; exact 1,850-character responses remain unchanged. [Security review](../docs/matchmaker-signed-preview-truncation-safety-2026-11-21.md).
+- Two **signed offline HTTP** regressions; **252/252 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44903764418)), [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44903764410), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44903764406) on code/test commit `68dd09f0`. Read-only staging Edge v18 ACTIVE, 1 listing/preview, 9 replays, 0 publish/cleanup/receipt/reconciliation; no deploy, DB write, Discord action, public post, member change, production Den Missions or original Squad Finder change.
+- **Still NOT launch-ready**: actual Discord-client ACK timing; separately approved original-bot posting and reference-bound GET-before-DELETE; authenticated scheduler/expiry E2E; independent security review; explicit release consent. PR #2 remains draft/unmerged.
+
+---
+
 ## November 21, 2026 UTC — isolated hosted Edge v18 latency baseline (READ-ONLY; NOT ACK CERTIFICATION)
 
 - Read-only previous-24h Supabase `function_edge_logs` for isolated staging Edge **v18**: eight POST HTTP 200 samples (mean execution 230.8 ms, p95 406.05 ms, max 433 ms); 122 POST 401 denials and 117 GET /health responses tracked separately. These are **server execution times**, not client-observed initial ACK timing. Access logs cannot distinguish PING versus /squad among the eight successful POSTs. [Reproducible evidence and limits](../docs/matchmaker-v18-hosted-edge-latency-evidence-2026-11-21.md).
