@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — invisible-text rejection begins at private /squad preview (draft-only, verified)
+
+- Input validation now rejects invisible bidirectional/layout controls before a user-provided game or availability preference enters a private preview or private Matchmaker listing. The public outbox also rejects U+061C/U+FEFF if historical stored values bypass this validator. Accented Unicode and ZWJ emoji remain allowed. [Review details](../docs/matchmaker-private-preview-invisible-text-guard-2026-11-21.md).
+- **239/239 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44866441243)); [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44866441316); [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44866441228)) at code/test `f8a66057`. Read-only isolated staging: 1 listing, 1 preview, 9 replays, **0** posting/cleanup/receipt/audit rows; **nothing deployed or written**.
+- **Not launch-ready:** actual Discord-client ACK latency, separately authorized bot-owned posting and verified cleanup, scheduler/expiry, independent review, PR dirty mergeability and release approval remain open. No live Discord, guild, member or production Den Missions changes; manual Squad Finder preserved.
+
+---
+
 ## November 21, 2026 UTC — implicit staging database fallback must prove project identity (verified; NOT deployed)
 
 - The *automatic* `SUPABASE_DB_URL` fallback in the draft Edge runtime previously accepted opaque private hostnames without proof of staging ownership, risking cross-project routing even when `SUPABASE_URL` identified staging. The fallback now permits only the direct isolated staging Supabase database host or a canonical Supabase pooler with the staging-scoped role, while preserving existing wrong-project/TLS checks. Explicit private-proxy overrides remain compatible but **not independently release-cleared** and require separate manual review.
