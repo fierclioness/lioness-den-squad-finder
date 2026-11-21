@@ -1,3 +1,12 @@
+## November 21, 2026 — draft public-message Markdown containment (verified; NOT deployed)
+
+- Voluntary game/platform/preferences previously could include Discord Markdown metacharacters, enabling rendered headings, spoilers, code spans, fake links and emphasis within the bot-authored #squad-up layout. The draft outbox now escapes formatting metacharacters **after** normalizing CR/LF, while retaining emoji/accents, strict mention/URL/layout-control validation and the trusted bot header. One new adversarial mocked-post regression confirms the boundary and unchanged bot heading.
+- [Reproducible security review](../docs/matchmaker-public-markdown-escaping-review-2026-11-21.md). **237/237 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44856773327)), [Edge + hosted negative checks PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44856773334), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44856773350) on code/test `fb071987`.
+- Read-only staging: Edge v18 ACTIVE, one listing/preview, nine replay rows, **zero** publish/cleanup/receipt/reconciliation rows, seven private RLS/no-policy INFO advisories. No deployment, staging DB write, bot-owned public post, Discord app/guild/member change, Den Missions production edit or original manual Squad Finder change.
+- **Launch blocked:** real Discord-client ACK timing, separately authorized original-bot posting and GET-before-DELETE cleanup E2E, scheduler/expiry, independent review, PR conflicts and explicit release permission. PR #2 remains DRAFT/unmerged.
+
+---
+
 ## November 20, 2026 — draft-only Unicode layout spoofing guard (verified November 21 UTC)
 
 - Public outbox bot messages now reject Unicode bidi overrides/isolates, non-ASCII line separators, control characters and blank-only fields before any Discord POST; CR/LF runs collapse to one space and normal accented/emoji text remains usable. Two adversarial regressions validate no send + one quarantine for unsafe input, and safe Unicode formatting.
