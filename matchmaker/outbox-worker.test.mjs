@@ -169,3 +169,49 @@ test("public outbox rejects forged channel mentions even if unsafe data bypasses
  assert.equal(sends,0);
  assert.equal(quarantines,1);
 });
+
+
+test("public outbox quarantines invisible layout and direction-control spoofing before Discord POST",async()=>{
+ // U+202E reverses visual reading order. U+2028 and U+0085 can create
+ // fake message lines without an ASCII newline. Neither is a safe listing.
+ for(const unsafe of [
+   "Casual"+String.fromCharCode(0x202E)+"noitacifirev",
+   "Casual"+String.fromCharCode(0x2028)+"Fake moderator announcement",
+   "Casual"+String.fromCharCode(0x0085)+"Fake announcement",
+   "Casual"+String.fromCharCode(0x2066)+"isolate",
+   " \r\n\t "
+ ]){
+   let sends=0,quarantines=0;
+   const query=async statement=>{
+     if(statement.includes("claim_post"))return {rows:[{id:"12"}]};
+     if(statement.includes("squad_listings"))return {rows:[{...listing,vibe:unsafe}]};
+     if(statement.includes("fail_post")){quarantines++;return {rows:[{ok:true}]};}
+     throw Error("An unsafe listing was persisted");
+   };
+   const outcome=await create(query,async()=>{sends++;throw Error("Unsafe Discord send");}).runOnce();
+   assert.equal(outcome.status,"uncertain");
+   assert.equal(sends,0,"No Discord POST for unsafe text");
+   assert.equal(quarantines,1,"State is quarantined once");
+ }
+});
+
+test("public outbox preserves ordinary Unicode and normalizes CR/LF without extra Discord lines",async()=>{
+ let sentContent="",sends=0;
+ const query=async statement=>{
+   if(statement.includes("claim_post"))return {rows:[{id:"12"}]};
+   if(statement.includes("squad_listings"))
+     return {rows:[{...listing,game:"Pokémon 🎮",vibe:"Relaxed\r\nteam"}]};
+   if(statement.includes("finish_post_with_receipt"))return {rows:[{result:"posted_active"}]};
+   throw Error("Unexpected SQL");
+ };
+ const outcome=await create(query,async payload=>{
+   sends++;
+   sentContent=payload.content;
+   return {confirmed:true,messageId:"1546529501859815438",channelId,botUserId};
+ }).runOnce();
+ assert.equal(outcome.status,"posted");
+ assert.equal(sends,1);
+ assert.match(sentContent,/Pokémon 🎮/);
+ assert.match(sentContent,/Relaxed team/);
+ assert.doesNotMatch(sentContent,/Relaxed\r|Relaxed\n/);
+});
