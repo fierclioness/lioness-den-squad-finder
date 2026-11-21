@@ -6,6 +6,7 @@ const SNOW=/^\d{15,22}$/;
 // receipt. Never turn it into a candidate for original-bot deletion.
 const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 const STATES=new Set(["active","closed","expired"]);
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function planCleanup(record,{now=Date.now()}={}){
  if(!record || !STATES.has(record.status) || !Number.isFinite(now))throw Error("Invalid listing state");
  if(typeof record.expiresAtMs!=="number"||!Number.isFinite(record.expiresAtMs))throw Error("Missing expiry");
@@ -14,9 +15,11 @@ export function planCleanup(record,{now=Date.now()}={}){
   return {action:"manual",reason:"Posting may have succeeded without a receipt"};
  if(record.postState!=="posted")return {action:"none",reason:"No confirmed public message"};
  if(!exactSnow(record.messageId) || !exactSnow(record.channelId) ||
+    typeof record.postReference!=="string" || !UUID.test(record.postReference) ||
     record.botOwned!==true)
   return {action:"manual",reason:"Ownership, channel or receipt not verified"};
- return {action:"delete",messageId:record.messageId,channelId:record.channelId};
+ return {action:"delete",messageId:record.messageId,channelId:record.channelId,
+  postReference:record.postReference};
 }
 // The legacy cleanup transport must NEVER delete on DB-record trust alone.
 // Re-check the exact Discord message's author and channel before every DELETE.
@@ -32,9 +35,10 @@ export function makeMessageCleanupTransport({botToken,botUserId,channelId,fetchF
    async removeConfirmedBotPost(plan){
      if(!enabled)throw Error("Cleanup disabled");
      if(plan?.action!=="delete"||plan.channelId!==channelId||
-        !exactSnow(plan.messageId))
+        !exactSnow(plan.messageId) ||
+        typeof plan.postReference!=="string" || !UUID.test(plan.postReference))
        throw Error("Unverified message deletion request");
-     return verified.remove(plan.messageId);
+     return verified.remove(plan.messageId,plan.postReference);
    }
  });
 }
