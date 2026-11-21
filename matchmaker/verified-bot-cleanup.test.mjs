@@ -219,7 +219,7 @@ test("unreadable Discord GET JSON cannot authorize DELETE",async()=>{
 test("same-bot message without the original listing marker never reaches DELETE",async()=>{
  for(const content of [undefined,"Bot announcement",
   "🔎 Den ref: 11111111-1111-4111-8111-111111111111",
-  "🔎 Den ref: "+reference+"\\n🔎 Den ref: "+reference]){
+  "🔎 Den ref: "+reference+"\n🔎 Den ref: "+reference]){
   const methods=[];
   const safe=create(async(_url,init)=>{
    methods.push(init.method);
