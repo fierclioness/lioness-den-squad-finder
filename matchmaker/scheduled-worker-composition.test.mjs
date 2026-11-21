@@ -6,6 +6,7 @@ const secret="offline-example-key-not-a-real-secret-123456789";
 const token="test-only-not-a-real-discord-bot-token";
 const channelId="1546529501859815438",botUserId="1546529501859815439";
 const messageId="1546529501859815440";
+const reference="9ff00490-3730-4390-8c87-80f0aaffc231";
 const request=(task,key=secret)=>new Request(
  "https://staging.invalid/functions/v1/den-matchmaker-worker/"+task,{
   method:"POST",headers:{"x-matchmaker-scheduler-key":key}
@@ -113,7 +114,7 @@ test("mock cleanup path GET-verifies original bot post before DELETE",async()=>{
    return {rows:[{
     listing_id:"27",message_id:messageId,channel_id:channelId,bot_user_id:botUserId,
     receipt_message_id:messageId,receipt_channel_id:channelId,
-    receipt_bot_user_id:botUserId,listing_status:"closed",
+    receipt_bot_user_id:botUserId,listing_status:"closed",post_reference:reference,
     expires_at:"2026-11-19T00:00:00.000Z"
    }]};
   if(sql.includes("finish_cleanup"))return {rows:[{ok:true}]};
@@ -122,7 +123,8 @@ test("mock cleanup path GET-verifies original bot post before DELETE",async()=>{
  const fetchFn=async(url,init)=>{
   calls.push({url,method:init.method});
   if(init.method==="GET")return {status:200,json:async()=>({
-   id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}
+   id:messageId,channel_id:channelId,author:{id:botUserId,bot:true},
+   content:"🔎 Den ref: "+reference
   })};
   if(init.method==="DELETE")return {status:204};
   throw Error("Unexpected Discord request");
@@ -185,7 +187,7 @@ test("scheduler cleanup refuses to delete a different bot's message",async()=>{
   if(sql.includes("from matchmaker_internal.cleanup_outbox"))return {rows:[{
    listing_id:"27",message_id:messageId,channel_id:channelId,bot_user_id:botUserId,
    receipt_message_id:messageId,receipt_channel_id:channelId,
-   receipt_bot_user_id:botUserId,listing_status:"closed",
+   receipt_bot_user_id:botUserId,listing_status:"closed",post_reference:reference,
    expires_at:"2026-11-19T00:00:00.000Z"
   }]};
   if(sql.includes("finish_cleanup")){
