@@ -9,7 +9,7 @@ const exactSnow=value=>typeof value==="string"&&SNOW.test(value);
 // line separators, or terminal controls from user-supplied preference fields.
 // CR/LF are normalized below; the remaining controls cannot structure/spoof
 // extra public lines. Emoji and ordinary non-ASCII text remain supported.
-const UNSAFE_LAYOUT=/[\u0000-\u0009\u000B-\u000C\u000E-\u001F\u007F-\u009F\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/u;
+const UNSAFE_LAYOUT=/[\u0000-\u0009\u000B-\u000C\u000E-\u001F\u007F-\u009F\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069\u061C\uFEFF]/u;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 // PostgreSQL bigint listing IDs must also stay exact strings; Number can round
 // an int8 claim and accidentally operate on a different persisted listing.
