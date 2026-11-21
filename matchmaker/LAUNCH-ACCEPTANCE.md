@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — exact Discord POST content receipt (DRAFT ONLY, verified)
+
+- Guarded Discord transport now requires exact returned message `content` in addition to HTTP 200, original-bot and fixed-channel/message identifiers before confirming public opt-in listing delivery. Mismatched/missing body remains UNCERTAIN, **not retried** (Discord may normalize/strip characters). Five adversarial response variants covered. [Review](../docs/matchmaker-discord-post-content-receipt-gate-2026-11-21.md).
+- **246/246 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44885536993)); [Edge checks PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44885536970); [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44885537094) at code/test `47074e60`.
+- Read-only staging Edge v18 ACTIVE; one listing, one preview, nine replays, zero post/cleanup/receipt/reconciliation rows. No deployment, staging write, public Discord post, bot/member/settings change, production Den Missions modification, original Squad Finder change or merge. **Not launch-ready:** live ACK, approved original-bot POST/GET-before-DELETE, scheduler expiry E2E, independent security review, conflicts and release approval remain open.
+
+---
+
 ## November 21, 2026 UTC — named-secret worker isolation review (DRAFT only)
 
 - Corrected a contradictory scheduler release comment that called for `verify_jwt=true`, despite the selected separate `withSupabase({auth:'secret:den-matchmaker-scheduler'})` named-secret service model with `verify_jwt=false` **on the worker only**. It still requires a second independent `x-matchmaker-scheduler-key`; no auth layer was removed or activated.
