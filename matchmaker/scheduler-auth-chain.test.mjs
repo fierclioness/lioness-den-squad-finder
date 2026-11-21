@@ -14,7 +14,7 @@ test("end-to-end mock auth layers reject invalid API key and scheduler key befor
  // Simulate the wrapper's independent API key verification. This does not
  // establish that the real Supabase SDK behaves identically.
  const withSupabase=(options,handler)=>{
-  assert.deepEqual(options,{auth:"secret:den-matchmaker-scheduler"});
+  assert.deepEqual(options,{auth:"secret:den_matchmaker_scheduler"});
   return async req=>{
    if(req.headers.get("apikey")!==expectedApiKey)
     return Response.json({error:"Unauthorized"},{status:401});
