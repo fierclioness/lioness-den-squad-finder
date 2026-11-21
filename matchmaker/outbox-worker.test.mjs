@@ -215,3 +215,33 @@ test("public outbox preserves ordinary Unicode and normalizes CR/LF without extr
  assert.match(sentContent,/Relaxed team/);
  assert.doesNotMatch(sentContent,/Relaxed\r|Relaxed\n/);
 });
+
+
+test("user preferences cannot inject Discord Markdown headings, spoilers, or fake links into public layout",async()=>{
+ let content="",posts=0;
+ const tick=String.fromCharCode(96),slash=String.fromCharCode(92);
+ const query=async statement=>{
+  if(statement.includes("claim_post"))return {rows:[{id:"12"}]};
+  if(statement.includes("squad_listings"))return {rows:[{
+   ...listing,game:"**Official** #1",platform:"Xbox > PC",
+   vibe:tick+"ADMIN"+tick,mic:"||Hidden||",timezone:"[Click](fake)",
+   availability:"Saturday\n# Important"
+  }]};
+  if(statement.includes("finish_post_with_receipt"))return {rows:[{result:"posted_active"}]};
+  throw Error("Unexpected database query");
+ };
+ const outcome=await create(query,async payload=>{
+  content=payload.content;posts++;
+  assert.deepEqual(payload.allowed_mentions,{parse:[]});
+  return {confirmed:true,messageId:"1546529501859815438",channelId,botUserId};
+ }).runOnce();
+ assert.equal(outcome.status,"posted");
+ assert.equal(posts,1);
+ assert.ok(content.includes(slash+"*"+slash+"*Official"+slash+"*"+slash+"* "+slash+"#1"));
+ assert.ok(content.includes("Xbox "+slash+"> PC"));
+ assert.ok(content.includes(slash+tick+"ADMIN"+slash+tick));
+ assert.ok(content.includes(slash+"|"+slash+"|Hidden"+slash+"|"+slash+"|"));
+ assert.ok(content.includes(slash+"[Click"+slash+"]"+slash+"(fake"+slash+")"));
+ assert.ok(content.includes("Saturday "+slash+"# Important"));
+ assert.match(content,/👑 \*\*Looking for a squad\?\*\*/, "Bot-owned heading remains intact");
+});
