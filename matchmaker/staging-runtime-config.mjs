@@ -5,6 +5,22 @@
 const STAGING_REF="tcxktyqywsqafnyxhpgy";
 const STAGING_ORIGIN="https://"+STAGING_REF+".supabase.co";
 const DEN_MISSIONS_PRODUCTION_REF="cpjcjcxinhjusosaguyi";
+
+// A fallback SUPABASE_DB_URL is supplied automatically, not manually reviewed.
+// Refuse opaque addresses that could silently route even a staging Edge
+// function to an unrelated database. An explicitly provided private proxy
+// retains separate, review-gated compatibility; this is NOT its approval.
+function isAttributableStagingHost(databaseUrl){
+ try{
+  const parsed=new URL(databaseUrl);
+  const host=parsed.hostname.toLowerCase();
+  if(host==="db."+STAGING_REF+".supabase.co")return true;
+  if(!/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(host))return false;
+  const scoped=/^[a-z0-9_]+\.([a-z0-9]{20})$/.exec(decodeURIComponent(parsed.username).toLowerCase());
+  return scoped?.[1]===STAGING_REF;
+ }catch{return false;}
+}
+
 export function pointsAtWrongSupabaseProject(databaseUrl){
  // Deny Den Missions, plus any OTHER recognizable Supabase project ref.
  // Direct DB hosts carry the ref in db.<ref>.supabase.co; pooler users
@@ -59,7 +75,7 @@ export function resolvePrivateDatabaseUrl(readEnv) {
  }
  const stagingUrl=readEnv("SUPABASE_DB_URL");
  if(typeof stagingUrl==="string"&&/^(postgresql|postgres):\/\//.test(stagingUrl)
-    &&!pointsAtWrongSupabaseProject(stagingUrl))
+    &&!pointsAtWrongSupabaseProject(stagingUrl)&&isAttributableStagingHost(stagingUrl))
   return stagingUrl;
  return "";
 }
