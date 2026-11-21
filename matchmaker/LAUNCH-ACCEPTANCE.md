@@ -1,3 +1,12 @@
+## November 21, 2026 UTC — implicit staging database fallback must prove project identity (verified; NOT deployed)
+
+- The *automatic* `SUPABASE_DB_URL` fallback in the draft Edge runtime previously accepted opaque private hostnames without proof of staging ownership, risking cross-project routing even when `SUPABASE_URL` identified staging. The fallback now permits only the direct isolated staging Supabase database host or a canonical Supabase pooler with the staging-scoped role, while preserving existing wrong-project/TLS checks. Explicit private-proxy overrides remain compatible but **not independently release-cleared** and require separate manual review.
+- Regression covers opaque internal/production-shaped hosts, local hosts, recognized other-project DB URLs and a valid staging pooler. **238/238 Node PASS**, zero failures ([core CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44860068890)); [Edge TypeScript/hosted HTTP PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44860068921); [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44860068954). [Review details](../docs/matchmaker-implicit-db-fallback-isolation-review-2026-11-21.md). Code/test `c0fcb9c6`.
+- **Read-only staging**: Edge v18 ACTIVE; 1 listing, 1 preview, 9 replay rows; 0 publishing, cleanup, receipt or reconciliation rows; 0 overdue active listings or claimed cleanup. No database writes or deployment.
+- **Still blocked:** real Discord-client ACK timing, authorized original-bot POST/GET-before-DELETE cleanup, scheduler/expiry E2E, independent security review, unresolved PR #2 merge conflicts and explicit launch permission. PR remains draft/unmerged; Den Missions production, live Discord settings/posts/member data and original manual Squad Finder untouched.
+
+---
+
 ## November 21, 2026 — draft public-message Markdown containment (verified; NOT deployed)
 
 - Voluntary game/platform/preferences previously could include Discord Markdown metacharacters, enabling rendered headings, spoilers, code spans, fake links and emphasis within the bot-authored #squad-up layout. The draft outbox now escapes formatting metacharacters **after** normalizing CR/LF, while retaining emoji/accents, strict mention/URL/layout-control validation and the trusted bot header. One new adversarial mocked-post regression confirms the boundary and unchanged bot heading.
