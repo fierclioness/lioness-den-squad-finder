@@ -33,7 +33,11 @@ export function makeDiscordTransport({botToken,channelId,botUserId,fetchFn=fetch
   });
   // Any non-2xx response is marked ambiguous by the worker; do not blindly retry.
   if(response.redirected===true)throw Error("Redirected delivery is untrusted");
-  if(!response.ok)throw Error("Delivery not confirmed");
+  // Discord Create Message confirms publication with HTTP 200 and a
+  // trustworthy message object. Other 2xx statuses (e.g. 202 Accepted or
+  // 206 Partial Content) do NOT establish that a post exists: the outbox
+  // must quarantine any such delivery as uncertain, never auto-retry it.
+  if(response.status!==200 || response.ok!==true)throw Error("Delivery not confirmed");
   let data;
   try{data=await response.json();}catch{throw Error("Missing delivery receipt");}
   if(!data || !exactSnow(data.id) || data.channel_id!==channelId||
