@@ -123,6 +123,37 @@ test("preview buttons bind publishing consent to the exact button identifiers",a
  }
 });
 
+test("oversized signed consent preview fails closed without actionable buttons",async()=>{
+ const token="11111111-1111-4111-8111-111111111111";
+ let dispatches=0;
+ const handle=fixture({enabled:true,dispatch:async()=>{
+  dispatches++;
+  return {content:"Before confirming, read this disclosure: "+ "A".repeat(1900),
+   buttons:[{action:"confirm",token,label:"Post to #squad-up"},
+            {action:"cancel",token,label:"Cancel"}]};
+ }});
+ const body=await (await handle(signed({
+  type:2,guild_id,member,data:{name:"squad"}
+ }))).json();
+ assert.equal(dispatches,1);
+ assert.equal(body.type,4);
+ assert.equal(body.data.flags,64);
+ assert.deepEqual(body.data.allowed_mentions,{parse:[]});
+ assert.equal(body.data.components,undefined,
+  "Truncated consent must never leave a usable Confirm button");
+ assert.match(body.data.content,/couldn't safely display/);
+ assert.doesNotMatch(body.data.content,/A{100}/);
+});
+test("private response at exact length limit is not silently changed",async()=>{
+ const content="X".repeat(1850);
+ const handle=fixture({enabled:true,dispatch:async()=>({content})});
+ const body=await (await handle(signed({
+  type:2,guild_id,member,data:{name:"squad"}
+ }))).json();
+ assert.equal(body.data.flags,64);
+ assert.equal(body.data.content,content);
+ assert.equal(body.data.content.length,1850);
+});
 test("enabled commands cannot accidentally authorize the whole guild",()=>{
  assert.throws(()=>fixture({enabled:true,allowedTesterIds:null}),/nonempty tester allowlist/);
  assert.throws(()=>fixture({enabled:true,allowedTesterIds:new Set()}),/nonempty tester allowlist/);
