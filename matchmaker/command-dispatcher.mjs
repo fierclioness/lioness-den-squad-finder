@@ -63,7 +63,9 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
    return {content:"Use /squad create, mine, list, or close."};
   }
   if(input.type===3&&typeof data?.custom_id==="string"){
-   const match=/^mm:(confirm|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(private|public)$/i.exec(data.custom_id);
+   // Match action and mode exactly: a case-altered "CANCEL" must never fall through to confirmation.
+   // Tokens created by the preview are lowercase UUIDs; reject alternate spellings fail-closed.
+   const match=/^mm:(confirm|cancel):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(private|public)$/.exec(data.custom_id);
    if(!match)return {content:"Button no longer available. Create a fresh squad request."};
    // Consent is bound to the preview button mode. A deployment flag change
    // must never reinterpret a private preview as authorization to publish.
