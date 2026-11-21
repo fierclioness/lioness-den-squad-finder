@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — genuine PostgreSQL cross-session signed replay race (DRAFT ONLY)
+
+- Added a six-connection, **real disposable PostgreSQL** signed-HTTP concurrency test: alternating /squad mine/list payloads with the **same valid signed interaction ID** must produce exactly **one** private HTTP 200, **five** HTTP 401 replay denials, one downstream dispatch, and one durable replay row. No in-memory Set substitutes for the database claim. [Reproducible evidence](../docs/matchmaker-cross-session-signed-replay-race-2026-11-21.md).
+- Verified on test code `34864318`: **246/246 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44889253709)); [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44889253738); [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44889253759). This is offline concurrency evidence, **not** actual Discord client/server ACK timing.
+- Isolated staging read-only (Edge v18 ACTIVE): 1 listing, 1 pending preview, 9 replay rows and 0 publish/cleanup/receipt/reconciliation rows. Seven informational private-table RLS/no-policy notices. No deployment, staging writes, Discord settings, guild/member changes, public messages, production Den Missions change, manual Squad Finder modification or PR merge. **Still NOT launch-ready:** live Discord-client ACK <3s, independently authorized bot-owned POST/GET-before-DELETE, scheduler/expiry E2E, independent security review and explicit release authorization remain open.
+
+---
+
 ## November 21, 2026 UTC — draft PR merge conflict CLEARED, no merge performed
 
 - Safely synchronized the draft manual test-command registration workflow with `main`'s more guarded version: pinned test feature-branch checkout, `persist-credentials:false`, explicit typed `REGISTER_TEST_ONLY` dispatch gate. File source/target SHA independently matched. **GitHub now reports draft PR #2 mergeable:true, merged:false** after prior mergeable:false. [Review](../docs/matchmaker-pr-mergeability-guarded-workflow-review-2026-11-21.md); commit `9ae80f6e`.
