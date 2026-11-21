@@ -57,3 +57,15 @@ test("offline listing ownership never rounds numeric or object-coerced Discord I
  }
  assert.equal(closeListing(listing,rounded,1001).status,"closed");
 });
+
+// Reject layout spoofing at the earliest opt-in validation boundary, including
+// private /squad preview and list (not only the later public post worker).
+test("opt-in draft validation rejects invisible direction/layout controls but preserves emoji",()=>{
+ for(const hidden of ["\u202e","\u2066","\u0085","\u061c","\ufeff","\u2028","\u2029"]){
+  assert.throws(()=>validateDraft({...draft,game:"Team"+hidden+"moderator"}),/Unsafe invisible/);
+  assert.throws(()=>validateDraft({...draft,availability:"Tonight"+hidden+"urgent"}),/Unsafe invisible/);
+ }
+ const valid=validateDraft({...draft,game:"Pokémon 🎮",availability:"Co-op 👩‍💻 on Saturday"});
+ assert.equal(valid.game,"Pokémon 🎮");
+ assert.equal(valid.availability,"Co-op 👩‍💻 on Saturday");
+});
