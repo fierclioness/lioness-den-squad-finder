@@ -179,6 +179,8 @@ test("public outbox quarantines invisible layout and direction-control spoofing 
    "Casual"+String.fromCharCode(0x2028)+"Fake moderator announcement",
    "Casual"+String.fromCharCode(0x0085)+"Fake announcement",
    "Casual"+String.fromCharCode(0x2066)+"isolate",
+   "Casual"+String.fromCharCode(0x061C)+"invisible",
+   "Casual"+String.fromCharCode(0xFEFF)+"hidden",
    " \r\n\t "
  ]){
    let sends=0,quarantines=0;
