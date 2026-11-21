@@ -16,6 +16,15 @@ test("inert worker scaffold cannot touch private database or Discord",()=>{
  }
 });
 
+test("Discord interaction webhook stays isolated from the scheduler and bot-owned workers",()=>{
+ const webhook=readFileSync(new URL("../supabase/functions/den-matchmaker/index.ts",import.meta.url),"utf8");
+ for(const unsafe of [
+  /den-matchmaker-worker/,/den-matchmaker-scheduler/,/makeSupabaseAuthenticatedScheduler/,
+  /makeScheduledWorkerComposition/,/makeScheduledWorkerGateway/,/npm:@supabase\/server/
+ ])assert.doesNotMatch(webhook,unsafe,"Signed Discord ingress must never load privileged scheduler or bot worker code");
+ assert.match(webhook,/makeMatchmakerServer/);
+ assert.match(webhook,/DEN_MATCHMAKER_COMMANDS_ENABLED/);
+});
 test("JWT bypass is scoped only to the named-secret worker, never the Discord webhook",()=>{
  const config=readFileSync(new URL("../supabase/config.toml",import.meta.url),"utf8");
  assert.match(config,/\[functions\.den-matchmaker-worker\]\s*verify_jwt\s*=\s*false/);
