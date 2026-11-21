@@ -85,7 +85,8 @@ test("mock posting path sends once to fixed text channel and records trusted rec
  const fetchFn=async(url,init)=>{
   sent.push({url,init});
   return {ok:true,status:200,json:async()=>({
-   id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}
+   id:messageId,channel_id:channelId,content:JSON.parse(init.body).content,
+   author:{id:botUserId,bot:true}
   })};
  };
  const handle=makeScheduledWorkerComposition({
