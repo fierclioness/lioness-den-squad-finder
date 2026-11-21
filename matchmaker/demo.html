@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Den Matchmaker — Preview Only</title><style>
+:root{color-scheme:dark;--bg:#130d19;--panel:#25162c;--gold:#efd092;--pink:#b62a81;--text:#faecf7}*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top right,#532543,transparent 54%),var(--bg);color:var(--text);font:16px system-ui,sans-serif}
+main{max-width:880px;margin:auto;padding:32px 18px 65px}h1{font-size:clamp(2rem,6vw,3.2rem);color:var(--gold);margin:8px 0}.eyebrow{letter-spacing:.17em;color:var(--gold);font-size:.75rem;font-weight:800}
+p,.hint{color:#d9c3d2;line-height:1.55}.card{background:var(--panel);border:1px solid #7a466c;border-radius:18px;padding:20px;margin:20px 0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{min-width:0}label{display:block;margin-bottom:6px;font-size:.9rem;font-weight:700}
+input,select{width:100%;background:#100c14;border:1px solid #996286;border-radius:9px;color:white;padding:12px;font:inherit;min-height:46px}
+button{cursor:pointer;background:var(--pink);border:1px solid #df76b5;color:#fff;font:inherit;font-weight:800;border-radius:10px;padding:12px 18px;min-height:44px}
+button.secondary{background:#35233e}button:disabled{opacity:.45;cursor:not-allowed}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#110d17;border:1px solid #7b5473;border-radius:12px;line-height:1.6}
+:focus-visible{outline:3px solid var(--gold);outline-offset:3px}.notice{border-left:4px solid var(--gold);padding:12px;background:#33223a}
+@media(max-width:620px){.grid{grid-template-columns:1fr}main{padding:20px 12px}.card{padding:16px}}
+</style></head><body><main><div class="eyebrow">THE LIONESS DEN · INTERNAL PREVIEW</div>
+<h1>👑 Den Matchmaker</h1><p>Find your people. Play your way. No pressure.</p>
+<p class="notice">This is a demo only. Nothing is saved or posted to Discord. Your existing Squad Finder is unchanged.</p>
+<form class="card" id="form"><div class="grid">
+<div class="field"><label for="game">Game</label><input id="game" maxlength="55" required value="Call of Duty"></div>
+<div class="field"><label for="platform">Platform</label><select id="platform"><option>Xbox</option><option>PlayStation</option><option>PC</option><option>Switch</option><option>Cross-play</option><option>Other</option></select></div>
+<div class="field"><label for="vibe">Play style</label><select id="vibe"><option>Casual</option><option>Competitive</option><option>Either</option></select></div>
+<div class="field"><label for="mic">Mic</label><select id="mic"><option>Optional</option><option>Required</option><option>No mic</option></select></div>
+<div class="field"><label for="timezone">Time zone</label><select id="timezone"><option>ET</option><option>CT</option><option>MT</option><option>PT</option><option>AT</option><option>UK</option><option>CET/CEST</option><option>UTC</option><option>Other</option></select></div>
+<div class="field"><label for="availability">When can you play?</label><input id="availability" maxlength="70" value="Saturday evening" required></div></div>
+<p class="hint">Listings will eventually be opt-in, last 36 hours, and allow one active listing per member. No automatic DMs.</p>
+<button type="submit">Preview my squad post</button></form>
+<section class="card" aria-labelledby="previewTitle"><h2 id="previewTitle">✨ Your squad request</h2><pre id="preview" aria-live="polite">Complete the form and select Preview.</pre><p id="status" role="status"></p><button class="secondary" id="clear" type="button">Clear preview</button></section>
+</main><script type="module">
+import {validateDraft,formatPreview} from "./matchmaker-core.mjs";
+const ids=["game","platform","vibe","mic","timezone","availability"];
+const form=document.querySelector("#form"),preview=document.querySelector("#preview"),status=document.querySelector("#status");
+form.addEventListener("submit",event=>{
+ event.preventDefault();
+ try{
+  const d=validateDraft(Object.fromEntries(ids.map(id=>[id,document.getElementById(id).value])));
+  preview.textContent=formatPreview(d);
+  status.textContent="Preview ready. Nothing was saved or published.";
+ }catch(error){status.textContent=error.message;preview.textContent="Please correct the form.";}
+});
+document.querySelector("#clear").addEventListener("click",()=>{preview.textContent="Complete the form and select Preview.";status.textContent="";});
+</script></body></html>

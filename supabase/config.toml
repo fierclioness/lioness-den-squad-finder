@@ -1,0 +1,6 @@
+# DRAFT: this configuration is not deployed automatically.
+# The existing Discord webhook is unaffected by this function-specific setting.
+# This separate worker authenticates with Supabase's named-secret wrapper;
+# Supabase's JWT platform check cannot validate modern sb_secret_* API keys.
+[functions.den-matchmaker-worker]
+verify_jwt = false

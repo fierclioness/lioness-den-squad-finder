@@ -1,0 +1,71 @@
+name: Den Matchmaker Postgres integration
+on:
+  pull_request:
+    paths:
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-postgres.yml'
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-postgres.yml'
+permissions:
+  contents: read
+jobs:
+  postgres-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: testonly
+          POSTGRES_DB: matchmaker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d matchmaker_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: testonly
+      PGDATABASE: matchmaker_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Test proposed SQL on ephemeral PostgreSQL only
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/postgres-smoke.sql
+      - name: Test outbox delivery safety on same disposable database
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/outbox-postgres.sql
+      - name: Test durable cleanup queue on same disposable database
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/cleanup-postgres.sql
+      - name: Test close and late-post receipt coordination
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/post-close-race-postgres.sql
+      - name: Test audited manual receipt recovery in disposable DB
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/manual-reconciliation-postgres.sql
+      - name: Test unique opaque reference on disposable listings
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/listing-reference-postgres.sql
+      - name: Test atomic confirm-and-enqueue with rollback safety
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/atomic-confirm-postgres.sql
+      - name: Test abandoned worker quarantine and no automatic retries
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/stale-claims-postgres.sql
+      - name: Test bounded expiry and original-receipt-only cleanup on disposable database
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/expiry-postgres.sql
+      - name: Test bounded privacy/replay retention in disposable PostgreSQL
+        run: psql -X -v ON_ERROR_STOP=1 -f matchmaker/tests/retention-postgres.sql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned PostgreSQL client for isolated adapter test
+        run: npm install --no-save --package-lock=false --ignore-scripts pg@8.16.3
+      - name: Test actual parameterized store adapter against disposable PostgreSQL
+        run: node matchmaker/tests/postgres-store-integration.mjs
+      - name: Test signed Discord HTTP to isolated PostgreSQL roundtrip
+        run: node matchmaker/tests/signed-http-postgres-integration.mjs
+      - name: Test outbox persistence with mocked Discord posting
+        run: node matchmaker/tests/postgres-discord-publisher-integration.mjs

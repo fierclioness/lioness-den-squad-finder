@@ -1,0 +1,66 @@
+name: Den Matchmaker Edge TypeScript check
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/den-matchmaker/**'
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-deno.yml'
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - 'supabase/functions/den-matchmaker/**'
+      - 'matchmaker/**'
+      - '.github/workflows/matchmaker-deno.yml'
+permissions:
+  contents: read
+jobs:
+  deno-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge entrypoint (without any production connection)
+        run: deno check supabase/functions/den-matchmaker/index.ts
+      - name: Real hosted staging HTTP smoke (no secrets or writes)
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          test "$STAGING_URL" != "https://cpjcjcxinhjusosaguyi.supabase.co/functions/v1/den-matchmaker"
+          code=$(curl --silent --show-error --max-time 20 --retry 2 --output /tmp/den_health.json --write-out '%{http_code}' "$STAGING_URL/health")
+          echo "Staging health HTTP status: $code"
+          head -c 350 /tmp/den_health.json || true
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_health.json') as f: data=json.load(f)
+          # Authorized test commands may be enabled in isolated staging.
+          # Keep public posting OFF and the diagnostic read-only.
+          assert data.get('service') == 'den-matchmaker', data
+          assert data.get('environment') == 'staging', data
+          assert data.get('status') in ('commands_disabled','commands_enabled'), data
+          assert data.get('posting_enabled') is False, data
+          assert data.get('member_data_access') is False, data
+          assert set(data) == {'service','environment','status','posting_enabled','member_data_access'}, data
+          print('Real hosted staging HTTP health passed, no database writes')
+          PY
+      - name: Verify unsigned staging POST is rejected
+        env:
+          STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --show-error --max-time 20 --output /tmp/den_noauth.json --write-out '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$STAGING_URL")
+          echo "Unsigned staging POST HTTP status: $code"
+          head -c 250 /tmp/den_noauth.json || true
+          echo
+          test "$code" = "401"
+          python3 - <<'PY'
+          import json
+          with open('/tmp/den_noauth.json') as f: data=json.load(f)
+          assert data.get('error') == 'Unauthorized', data
+          print('PASS: public signing key loaded, unsigned POST rejected with 401')
+          PY
