@@ -7,6 +7,9 @@ import {makeDiscordTransport} from "../discord-transport.mjs";
 import {makeOutboxWorker} from "../outbox-worker.mjs";
 import {makeCleanupOutboxWorker} from "../cleanup-outbox-worker.mjs";
 import {makeVerifiedBotCleanup} from "../verified-bot-cleanup.mjs";
+import {makeMaintenanceWorker} from "../maintenance-worker.mjs";
+import {makeScheduledWorkerGateway} from "../scheduled-worker-gateway.mjs";
+import {makeAuthenticatedSchedulerAdapter} from "../authenticated-scheduler-adapter.mjs";
 if(process.env.PGHOST!=="localhost"||process.env.PGDATABASE!=="matchmaker_test")
  throw Error("Refusing non-ephemeral database");
 const client=new pg.Client({host:process.env.PGHOST,port:Number(process.env.PGPORT||5432),
@@ -113,5 +116,120 @@ try {
  assert.equal((await query(
   "select count(*)::int as count from matchmaker_internal.cleanup_outbox where listing_id=$1",
   [second.listingId])).rows[0].count,0);
+
+ // Expiry-to-cleanup authorized scheduler chain (DISPOSABLE DB + MOCK Discord).
+ // A valid original-bot receipt is published first; then the synthetic listing
+ // is aged past its 36-hour expiry only in the disposable CI database.
+ // Real Supabase named-secret verification is NOT exercised by this mock.
+ const expiringActor={guildId:actor.guildId,memberId:"1418199180287148192"};
+ const expiringPreview=await store.prepare(expiringActor,draft);
+ const expiring=await store.confirm(expiringActor,expiringPreview.token);
+ const expiryMessageId="1546529501859815449";
+ const expiryReference=(await query(
+  "select post_reference::text as ref from matchmaker_internal.squad_listings where id=$1::bigint",
+  [expiring.listingId])).rows[0].ref;
+ let expiryPosts=0;
+ const expiringTransport=makeDiscordTransport({
+  enabled:true,botToken:"testing-only-not-real-token-0123456",channelId,botUserId,
+  fetchFn:async(url,options)=>{
+   expiryPosts++;
+   assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages");
+   assert.equal(options.method,"POST");
+   const payload=JSON.parse(options.body);
+   assert.match(payload.content,new RegExp("🔎 Den ref: "+expiryReference));
+   assert.deepEqual(payload.allowed_mentions,{parse:[]});
+   return {ok:true,status:200,json:async()=>({
+    id:expiryMessageId,channel_id:channelId,content:payload.content,
+    author:{id:botUserId,bot:true}
+   })};
+  }
+ });
+ const expiryPublisher=makeOutboxWorker({
+  enabled:true,query,sendMessage:expiringTransport.sendMessage,channelId,botUserId,
+  newWorkerId:()=>"44444444-4444-4444-8444-444444444444"
+ });
+ assert.equal((await expiryPublisher.runOnce()).status,"posted");
+ assert.equal(expiryPosts,1);
+ // Only local disposable fixtures may be aged using direct SQL.
+ await query(
+  "update matchmaker_internal.squad_listings set created_at=clock_timestamp()-interval '40 hours', "+
+  "expires_at=clock_timestamp()-interval '4 hours' where id=$1::bigint",
+  [expiring.listingId]);
+ const schedulerSecret="synthetic-disposable-scheduler-secret-1234567890";
+ const maintenance=makeMaintenanceWorker({
+  enabled:true,query,batchSize:50,staleMinutes:10
+ });
+ const gateway=makeScheduledWorkerGateway({
+  enabled:true,schedulerSecret,maintenanceEnabled:true,maintenance
+ });
+ const authenticated=makeAuthenticatedSchedulerAdapter({enabled:true,gateway});
+ const maintenanceUrl="https://offline.invalid/run/maintenance";
+ const requestWithKey=key=>new Request(maintenanceUrl,{
+  method:"POST",headers:{"x-matchmaker-scheduler-key":key}
+ });
+ assert.equal((await authenticated(requestWithKey(schedulerSecret),null)).status,401,
+  "No verified upstream named-secret context must prevent worker invocation");
+ assert.equal((await authenticated(
+  requestWithKey("bad-scheduler-secret-even-when-outer-auth-says-secret"),
+  {authMode:"secret"})).status,401,
+  "A valid upstream wrapper alone cannot bypass the independent scheduler key");
+ const before=(await query(
+  "select status from matchmaker_internal.squad_listings where id=$1::bigint",
+  [expiring.listingId])).rows[0].status;
+ assert.equal(before,"active","Denied scheduler calls must not expire listings");
+ const scheduled=await authenticated(requestWithKey(schedulerSecret),{authMode:"secret"});
+ assert.equal(scheduled.status,200);
+ const scheduledResult=await scheduled.json();
+ assert.equal(scheduledResult.task,"maintenance");
+ assert.equal(scheduledResult.status,"complete");
+ assert.ok((await query(
+  "select status from matchmaker_internal.squad_listings where id=$1::bigint",
+  [expiring.listingId])).rows[0].status==="expired",
+  "Authenticated offline scheduler must expire the due, posted listing");
+ assert.deepEqual((await query(
+  "select state,message_id from matchmaker_internal.cleanup_outbox where listing_id=$1::bigint",
+  [expiring.listingId])).rows[0],{state:"pending",message_id:expiryMessageId});
+ let expiryGets=0,expiryDeletes=0;
+ const expiryCleanup=makeVerifiedBotCleanup({
+  enabled:true,botToken:"testing-only-not-real-token-0123456",channelId,botUserId,
+  fetchFn:async(url,init)=>{
+   assert.equal(url,"https://discord.com/api/v10/channels/"+channelId+"/messages/"+expiryMessageId);
+   if(init.method==="GET"){
+    expiryGets++;
+    return {status:200,json:async()=>({
+     id:expiryMessageId,channel_id:channelId,
+     author:{id:botUserId,bot:true},content:"🔎 Den ref: "+expiryReference
+    })};
+   }
+   assert.equal(init.method,"DELETE");
+   expiryDeletes++;
+   assert.equal(expiryGets,1,"GET ownership and listing reference check must precede DELETE");
+   return {status:204};
+  }
+ });
+ const expiryCleanupWorker=makeCleanupOutboxWorker({
+  enabled:true,query,verifiedCleanup:expiryCleanup,channelId,botUserId,
+  newWorkerId:()=>"55555555-5555-4555-8555-555555555555"
+ });
+ let expiryCleaned=null;
+ for(let i=0;i<25;i++){
+  const step=await expiryCleanupWorker.runOnce();
+  if(step.listingId===expiring.listingId){expiryCleaned=step;break;}
+  assert.ok(["quarantined","uncertain"].includes(step.status),
+   "Unrelated synthetic cleanup must never be mistaken for the expiring listing");
+ }
+ assert.deepEqual(expiryCleaned,{status:"deleted",listingId:expiring.listingId});
+ assert.equal(expiryGets,1);
+ assert.equal(expiryDeletes,1,"Only the original bot-owned synthetic message may be deleted once");
+ assert.deepEqual((await query(
+  "select state,attempts from matchmaker_internal.cleanup_outbox where listing_id=$1::bigint",
+  [expiring.listingId])).rows[0],{state:"done",attempts:1});
+ assert.equal((await authenticated(requestWithKey(schedulerSecret),{authMode:"secret"})).status,200,
+  "Idempotent follow-up scheduler run must stay healthy");
+ assert.equal((await query(
+  "select count(*)::int as n from matchmaker_internal.cleanup_outbox where listing_id=$1::bigint",
+  [expiring.listingId])).rows[0].n,1,"Expiry must not create a second cleanup job");
+ assert.equal(expiryPosts,1,"Expiry must never repost a listing");
+ console.log("Disposable PostgreSQL, mocked scheduler auth, posted expiry and GET-before-DELETE cleanup PASSED");
  console.log("Disposable Postgres + mocked Discord posting AND verified cleanup integration PASSED");
 } finally {await client.end();}
