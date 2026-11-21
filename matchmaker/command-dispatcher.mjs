@@ -1,6 +1,6 @@
 // Development-only command dispatcher with injectable authenticated storage.
 // No Discord network calls, no messages posted, no production credentials.
-import {validateDraft,formatPreview} from "./matchmaker-core.mjs";
+import {validateDraft,formatPreview,escapeDiscordDisplay} from "./matchmaker-core.mjs";
 const guild="1546529497925296199";
 const fields=["game","platform","vibe","mic","timezone","availability"];
 const option=(options,name)=>options.find(x=>x?.name===name)?.value;
@@ -32,13 +32,32 @@ export function makeMatchmakerDispatcher({store,publishingEnabled=false}){
    }
    if(sub?.name==="mine"){
     const item=await store.mine(actor);
-    return {content:item?"Your active squad: "+item.game+" · "+item.platform+" · "+item.vibe:"You have no active listing."};
+    if(!item)return {content:"You have no active listing."};
+    // Treat rows as untrusted at the response boundary, including historical
+    // data that predates draft input validation.
+    const d=validateDraft(item);
+    return {content:"Your active squad: "+[d.game,d.platform,d.vibe].map(escapeDiscordDisplay).join(" · ")};
    }
    if(sub?.name==="list"){
     const items=await store.list(actor);
     if(!Array.isArray(items))throw Error("Invalid listing response");
-    const lines=items.slice(0,10).map(x=>x.game+" · "+x.platform+" · "+x.vibe+" · "+x.availability+" ("+x.timezone+")");
-    return {content:lines.length?"Active opt-in listings:\n"+lines.join("\n"):"No active listings."};
+    if(!items.length)return {content:"No active listings."};
+    // Discord interaction responses have a size cap. Do not let the HTTP
+    // adapter silently slice a listing mid-field or hide omitted listings.
+    const limit=1800, header="Active opt-in listings:\n";
+    const notice="\nAdditional listings omitted to fit the response limit.";
+    let content=header, shown=0;
+    for(const item of items.slice(0,10)){
+     const d=validateDraft(item);
+     const line=[d.game,d.platform,d.vibe,d.availability+" ("+d.timezone+")"]
+       .map(escapeDiscordDisplay).join(" · ");
+     if(content.length+line.length+1+notice.length>limit)break;
+     content+=(shown?"\n":"")+line;
+     shown++;
+    }
+    if(shown===0)throw Error("Listing display exceeds response limit");
+    if(shown<items.length)content+=notice;
+    return {content};
    }
    if(sub?.name==="close")return {content:(await store.close(actor))?"Your listing was closed.":"No active listing to close."};
    return {content:"Use /squad create, mine, list, or close."};
