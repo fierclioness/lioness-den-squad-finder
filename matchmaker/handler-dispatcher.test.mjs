@@ -90,3 +90,28 @@ test("concurrent identical signed interaction is dispatched exactly once",async(
  assert.equal(bodies.filter(x=>x?.data?.flags===64).length,1);
  assert.equal(bodies.filter(x=>x?.error==="Unauthorized").length,1);
 });
+
+// Offline signed end-to-end containment of stored preference text. This is
+// NOT a real Discord-client latency test or authorization to enable posting.
+test("signed private list response keeps whole escaped rows and visible omissions",async()=>{
+ const long={...draft,game:"*".repeat(55),availability:"_".repeat(70)};
+ const rows=Array.from({length:10},()=>({...long}));
+ const store={
+  prepare:async()=>null,confirm:async()=>null,cancel:async()=>false,
+  mine:async()=>null,list:async()=>rows,close:async()=>false
+ };
+ const handle=makeMatchmakerHttpHandler({
+  publicKeyHex,clock:()=>now,enabled:true,
+  allowedTesterIds:new Set([member.user.id]),claimReplay:async()=>true,
+  dispatch:makeMatchmakerDispatcher({store})
+ });
+ const response=await handle(request(cmd(member,"list")));
+ const body=await response.json();
+ assert.equal(response.status,200);
+ assert.equal(body.type,4);
+ assert.equal(body.data.flags,64);
+ assert.deepEqual(body.data.allowed_mentions,{parse:[]});
+ assert.ok(body.data.content.length<=1800);
+ assert.match(body.data.content,/Additional listings omitted to fit the response limit\.$/);
+ assert.match(body.data.content,/\\\*\\\*\\\*/);
+});
