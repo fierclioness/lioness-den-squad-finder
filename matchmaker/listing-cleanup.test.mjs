@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {planCleanup,makeMessageCleanupTransport} from "./listing-cleanup.mjs";
 const id="1546529501859815438",channel="1546529497925296199";
 const botUserId="1546529501859815439";
-const row={status:"active",expiresAtMs:1000,postState:"posted",botOwned:true,messageId:id,channelId:channel};
+const reference="9ff00490-3730-4390-8c87-80f0aaffc231";
+const row={postReference:reference,status:"active",expiresAtMs:1000,postState:"posted",botOwned:true,messageId:id,channelId:channel};
 const token="local-fake-not-a-real-token-12345";
 const endpoint="https://discord.com/api/v10/channels/"+channel+"/messages/"+id;
-const receipt=()=>({id,channel_id:channel,author:{id:botUserId,bot:true}});
+const receipt=()=>({id,channel_id:channel,author:{id:botUserId,bot:true},
+ content:"🔎 Den ref: "+reference});
 test("active requests do not get deleted; closed or expired can",()=>{
  assert.equal(planCleanup(row,{now:999}).action,"none");
  assert.equal(planCleanup({...row,status:"closed"},{now:999}).action,"delete");
@@ -18,6 +20,8 @@ test("never delete posts with ambiguous receipt, wrong owner or missing channel"
  assert.equal(planCleanup({...row,postState:"sending"},{now:2000}).action,"manual");
  assert.equal(planCleanup({...row,botOwned:false},{now:2000}).action,"manual");
  assert.equal(planCleanup({...row,messageId:null},{now:2000}).action,"manual");
+ assert.equal(planCleanup({...row,postReference:null},{now:2000}).action,"manual");
+ assert.equal(planCleanup({...row,postReference:"untrusted"},{now:2000}).action,"manual");
  assert.equal(planCleanup({...row,postState:"pending"},{now:2000}).action,"none");
 });
 test("transport is disabled by default; enabled requires independent bot identity",async()=>{
@@ -99,4 +103,16 @@ test("legacy enabled cleanup rejects coerced fixed channel and original-bot iden
   assert.throws(()=>makeMessageCleanupTransport({enabled:true,botToken:token,
    botUserId:bad,channelId:channel}),/identity/);
  }
+});
+
+test("legacy cleanup cannot DELETE an unrelated message authored by the same bot",async()=>{
+ let deletes=0;
+ const transport=makeMessageCleanupTransport({enabled:true,botToken:token,
+  botUserId,channelId:channel,fetchFn:async(_url,init)=>{
+   if(init.method==="DELETE"){deletes++;return {status:204};}
+   return {status:200,json:async()=>({...receipt(),
+    content:"🔎 Den ref: 11111111-1111-4111-8111-111111111111"})};
+  }});
+ await assert.rejects(transport.removeConfirmedBotPost(planCleanup(row,{now:2000})),/not verified/);
+ assert.equal(deletes,0);
 });
