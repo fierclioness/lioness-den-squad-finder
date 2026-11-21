@@ -1,3 +1,11 @@
+## November 21, 2026 UTC — named-secret worker isolation review (DRAFT only)
+
+- Corrected a contradictory scheduler release comment that called for `verify_jwt=true`, despite the selected separate `withSupabase({auth:'secret:den-matchmaker-scheduler'})` named-secret service model with `verify_jwt=false` **on the worker only**. It still requires a second independent `x-matchmaker-scheduler-key`; no auth layer was removed or activated.
+- Added a source regression forbidding privileged scheduler/worker imports into the signed Discord webhook. **245/245 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44879180234)), [Edge PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44879180266), [disposable PostgreSQL PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44879180217) on code/test `685fa851`. [Security review](../docs/matchmaker-worker-named-secret-isolation-review-2026-11-21.md).
+- Isolated staging remains v18 with one listing/preview and nine replays; zero publishing/cleanup/receipt/audit records. No worker deployment, scheduler activation, DB writes, Discord app/guild/member changes, public posts, production Den Missions modifications or original Squad Finder changes. **Still NOT launch-ready:** live Discord-client ACK, authorized worker + original-bot publishing/verified cleanup, expiry E2E, independent review, PR conflicts and explicit release consent are open.
+
+---
+
 ## November 21, 2026 UTC — invisible word-break controls fail closed (DRAFT, not deployed)
 
 - Private opt-in preview/storage and public bot-post boundaries now both reject U+200B, U+2060, U+00AD, U+034F and U+180E. This prevents visually concealed text in a game or availability preference while preserving accented text and ZWJ emoji. Existing stored rows must pass the public gate before any mocked POST. [Reproducible review](../docs/matchmaker-invisible-word-break-preferences-2026-11-21.md).
