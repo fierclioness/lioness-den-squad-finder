@@ -84,7 +84,7 @@ test("mock posting path sends once to fixed text channel and records trusted rec
  };
  const fetchFn=async(url,init)=>{
   sent.push({url,init});
-  return {ok:true,json:async()=>({
+  return {ok:true,status:200,json:async()=>({
    id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}
   })};
  };
@@ -275,4 +275,42 @@ test("scheduler composition rejects coerced Discord channel and bot IDs before a
   }
  }
  assert.equal(calls,0);
+});
+
+test("ambiguous HTTP 202 response with plausible Discord receipt quarantines the outbox, not posted",async()=>{
+ const queries=[];
+ let posts=0,claims=0;
+ const query=async(sql,params)=>{
+  queries.push(sql);
+  if(sql.includes("claim_post"))return {rows:[{id:claims++===0?"27":null}]};
+  if(sql.includes("from matchmaker_internal.squad_listings"))return {rows:[{
+   game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",
+   timezone:"ET",availability:"Saturday evening",
+   post_reference:"11111111-1111-4111-8111-111111111111"
+  }]};
+  if(sql.includes("fail_post")){
+   assert.equal(params[2],false,"Cannot classify accepted-but-unconfirmed response as unsent");
+   return {rows:[{ok:true}]};
+  }
+  throw Error("202 must never write a trusted receipt");
+ };
+ const handle=makeScheduledWorkerComposition({
+  query,schedulerSecret:secret,schedulerEnabled:true,
+  postingEnabled:true,destinationReviewed:true,botToken:token,botUserId,channelId,
+  fetchFn:async(_url,init)=>{
+   assert.equal(init.method,"POST");posts++;
+   return {ok:true,status:202,json:async()=>({
+    id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}
+   })};
+  }
+ });
+ const first=await handle(request("publish"));
+ assert.equal(first.status,200);
+ assert.deepEqual(await first.json(),{task:"publish",status:"uncertain"});
+ assert.equal(posts,1);
+ assert.equal(queries.filter(q=>q.includes("finish_post_with_receipt")).length,0);
+ assert.equal(queries.filter(q=>q.includes("fail_post")).length,1);
+ const second=await handle(request("publish"));
+ assert.deepEqual(await second.json(),{task:"publish",status:"empty"});
+ assert.equal(posts,1,"No automatic resend of ambiguous Discord delivery");
 });
