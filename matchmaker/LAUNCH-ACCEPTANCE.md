@@ -1,3 +1,12 @@
+## November 21, 2026 UTC — original-listing marker required before any Discord DELETE (DRAFT ONLY)
+
+- Security gap closed in both durable and legacy cleanup paths: matching original-bot/channel/message IDs alone could point at an unrelated post from the same bot. GET-before-DELETE now additionally requires exactly one matching **persisted random listing reference marker** in Discord's fetched content; missing, foreign and duplicated markers fail closed without DELETE. A malformed persisted marker cannot trigger a GET. [Review and limits](../docs/matchmaker-cleanup-reference-binding-review-2026-11-21.md).
+- **Final code/test `b77fd752`: 250/250 Node PASS** ([CI](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44896692866)); [Edge checks PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44896692789); [disposable PostgreSQL + mocked Discord PASS](https://github.com/fierclioness/lioness-den-squad-finder/actions/runs/44896692849). Initial legacy fixture failures were corrected; final suites green.
+- Isolated staging read-only: one listing, one preview, nine replay rows, zero post/cleanup/receipt/audit rows and zero overdue active listings. No deployment, staging database writes, live Discord calls, app/guild changes, member edits, production Den Missions changes, manual Squad Finder edits or PR merge.
+- **Still NOT launch-ready:** real Discord-client ACK under 3 seconds, separately approved original-bot POST/GET-before-DELETE controlled E2E, authenticated scheduler/expiry test, independent security review and explicit release authorization remain open. Commands/public posting remain OFF.
+
+---
+
 ## November 21, 2026 UTC — genuine PostgreSQL cross-session signed replay race (DRAFT ONLY)
 
 - Added a six-connection, **real disposable PostgreSQL** signed-HTTP concurrency test: alternating /squad mine/list payloads with the **same valid signed interaction ID** must produce exactly **one** private HTTP 200, **five** HTTP 401 replay denials, one downstream dispatch, and one durable replay row. No in-memory Set substitutes for the database claim. [Reproducible evidence](../docs/matchmaker-cross-session-signed-replay-race-2026-11-21.md).
