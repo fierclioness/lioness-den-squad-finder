@@ -5,10 +5,11 @@ import {makeVerifiedBotCleanup} from "./verified-bot-cleanup.mjs";
 const channelId="1546529497925296199",botUserId="1546529501859815438";
 const messageId="1546529501859815439";
 const workerId="11111111-1111-4111-8111-111111111111";
+const reference="9ff00490-3730-4390-8c87-80f0aaffc231";
 const receipt=()=>({
  listing_id:"8",message_id:messageId,channel_id:channelId,bot_user_id:botUserId,
  receipt_message_id:messageId,receipt_channel_id:channelId,receipt_bot_user_id:botUserId,
- listing_status:"closed",expires_at:"2026-12-01T00:00:00.000Z"
+ listing_status:"closed",expires_at:"2026-12-01T00:00:00.000Z",post_reference:reference
 });
 function fixture({rec=receipt(),remove=async()=>({status:"deleted"}),failFinish=false,throwFinish=false}={}){
  let claimed=false,finished=[],selected=0,claims=0;
@@ -51,7 +52,8 @@ test("after verified bot-only GET, one pending job is deleted exactly once",asyn
   botToken:"testing-only-not-real-bot-secret-0123",fetchFn:async(_url,init)=>{
     methods.push(init.method);
     return init.method==="GET"?{status:200,json:async()=>({
-      id:messageId,channel_id:channelId,author:{id:botUserId,bot:true}
+      id:messageId,channel_id:channelId,author:{id:botUserId,bot:true},
+      content:"🔎 Den ref: "+reference
     })}:{status:204};
   }});
  const fx=fixture({remove:verified.remove});
@@ -67,6 +69,8 @@ test("active unexpired listing and mismatched original receipt are quarantined b
   {...receipt(),receipt_message_id:"1546529501859815440"},
   {...receipt(),receipt_channel_id:"999999999999999999"},
   {...receipt(),receipt_bot_user_id:"999999999999999999"},
+  {...receipt(),post_reference:null},
+  {...receipt(),post_reference:"not-a-uuid"},
   null
  ]){
   let deletes=0;
@@ -170,4 +174,13 @@ test("rounded original receipt listing IDs cannot authorize Discord cleanup",asy
   assert.equal(removals,0);
   assert.deepEqual(fx.state().finished,[["8",workerId,false]]);
  }
+});
+
+test("cleanup sends the trusted persisted listing reference, never a caller-supplied marker",async()=>{
+ let received=null;
+ const fx=fixture({remove:async(id,ref)=>{
+  received={id,ref};return {status:"deleted"};
+ }});
+ assert.equal((await fx.worker.runOnce()).status,"deleted");
+ assert.deepEqual(received,{id:messageId,ref:reference});
 });
