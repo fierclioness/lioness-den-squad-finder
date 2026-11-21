@@ -86,7 +86,7 @@ try {
   }
   let concurrentDispatches=0;
   const contestedId="1572091972217215999";
-  const attempts=concurrentClients.map(contender=>{
+  const attempts=concurrentClients.map((contender,index)=>{
    const claimantStore=makePostgresMatchmakerStore({query:(sql,params)=>contender.query(sql,params)});
    const contenderHandler=makeMatchmakerHttpHandler({
     publicKeyHex,clock:()=>now,enabled:true,allowedTesterIds,
@@ -95,7 +95,7 @@ try {
    });
    // A fresh body stream and authentic signature per delivery, but one
    // Discord interaction ID; alternate payloads must not bypass deduplication.
-   return contenderHandler(signed({...cmd(member,"list"),id:contestedId}));
+   return contenderHandler(signed({...cmd(member,index%2===0?"list":"mine"),id:contestedId}));
   });
   const race=await Promise.all(attempts);
   assert.equal(race.filter(x=>x.status===200).length,1,
