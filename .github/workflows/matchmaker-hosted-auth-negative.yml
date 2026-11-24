@@ -1,0 +1,28 @@
+name: Den Matchmaker hosted auth negative smoke
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - '.github/workflows/matchmaker-hosted-auth-negative.yml'
+permissions:
+  contents: read
+jobs:
+  unauthenticated-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Confirm anonymous request is rejected by isolated staging worker
+        shell: bash
+        env:
+          WORKER_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker-worker
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --location --max-time 20 \
+            --output /tmp/den-worker-unauth-response \
+            --write-out '%{http_code}' \
+            --request POST "$WORKER_URL")
+          echo "Unauthenticated worker response status: $status"
+          test "$status" = "401"
+          echo "PASS: anonymous caller rejected; no API key used or logged."

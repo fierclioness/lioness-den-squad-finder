@@ -1,0 +1,47 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {makeMockMatchmaker} from "./matchmaker-command-mock.mjs";
+const actor={guildId:"1546529497925296199",memberId:"1418199180287148073"};
+const guest={guildId:"1546529497925296199",memberId:"1546529501859815438"};
+const draft={game:"Call of Duty",platform:"Xbox",vibe:"Casual",mic:"Optional",timezone:"ET",availability:"Saturday evening"};
+test("preview requires explicit confirmation, and all replies are private",()=>{
+ let time=1000000;
+ const app=makeMockMatchmaker({clock:()=>time});
+ const preview=app.create(actor,draft);
+ assert.equal(preview.flags,64);
+ assert.deepEqual(preview.actions,["confirm","cancel"]);
+ assert.equal(app.mine(actor).listing,null);
+ assert.equal(app.list(actor).listings.length,0);
+ const result=app.confirm(actor);
+ assert.equal(result.mockOnly,true);
+ assert.equal(result.flags,64);
+ assert.equal(app.mine(actor).listing.game,"Call of Duty");
+ assert.equal(app.list(actor).listings.length,1);
+ assert.equal(app.list(actor).listings[0].ownerId,undefined);
+ assert.match(app.create(actor,draft).content,/already/);
+ assert.match(app.close(guest).content,/no active/i);
+ assert.equal(app.mine(actor).listing.status,"active");
+ assert.match(app.close(actor).content,/closed/);
+ assert.equal(app.list(actor).listings.length,0);
+ assert.match(app.create(actor,draft).content,/Review/);
+ assert.match(app.confirm(actor).content,/wait a minute/);
+ time+=61000;
+ assert.equal(app.confirm(actor).mockOnly,true);
+});
+test("cancel and expired confirmation never create listings",()=>{
+ let time=1000000;
+ const app=makeMockMatchmaker({clock:()=>time});
+ app.create(actor,draft);
+ assert.match(app.cancel(actor).content,/cancelled/);
+ assert.match(app.confirm(actor).content,/No pending/);
+ app.create(actor,draft);
+ time+=10*60*1000+1;
+ assert.match(app.confirm(actor).content,/expired/);
+ assert.equal(app.list(actor).listings.length,0);
+});
+test("reject commands outside guild and malformed input",()=>{
+ const app=makeMockMatchmaker();
+ assert.throws(()=>app.create({...actor,guildId:"999999999999999999"},draft),/Lioness Den/);
+ assert.throws(()=>app.list({guildId:actor.guildId,memberId:"invalid"}),/Lioness Den/);
+ assert.throws(()=>app.create(actor,{...draft,game:"@everyone"}),/Mentions/);
+});

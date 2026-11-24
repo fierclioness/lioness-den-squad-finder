@@ -1,0 +1,36 @@
+name: Den Matchmaker core tests
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/matchmaker-tests.yml'
+  push:
+    branches:
+      - 'feature/den-matchmaker-mvp-2026-11-18'
+    paths:
+      - 'matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/matchmaker-tests.yml'
+permissions:
+  contents: read
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test matchmaker/*.test.mjs
+  edge-worker-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/den-matchmaker-worker/index.ts
