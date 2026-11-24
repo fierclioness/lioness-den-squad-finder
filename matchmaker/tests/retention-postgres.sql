@@ -61,3 +61,44 @@ end $$;
 reset role;
 rollback;
 select 'Disposable transient retention, replay guard and privilege tests PASSED' as result;
+
+-- Manual-only listing retention: all synthetic fixtures are rolled back.
+begin;
+do $$
+declare ids bigint[]; item bigint; i integer;
+begin
+ if has_function_privilege('anon','matchmaker_internal.purge_resolved_listings(integer)','EXECUTE')
+ or has_function_privilege('authenticated','matchmaker_internal.purge_resolved_listings(integer)','EXECUTE')
+ or has_function_privilege('service_role','matchmaker_internal.purge_resolved_listings(integer)','EXECUTE')
+ then raise exception 'Unexpected listing-retention grant'; end if;
+ for i in 1..6 loop
+  insert into matchmaker_internal.squad_listings
+   (owner_discord_id,game,platform,vibe,mic,timezone,availability,status,created_at,expires_at,closed_at)
+  values ('15720919722172130'||i::text,'Synthetic','Xbox','Casual','Optional','ET','Weekend',
+   case when i=6 then 'active' else 'closed' end,
+   clock_timestamp()-interval '100 hours',
+   case when i=6 then clock_timestamp()+interval '1 hour' else clock_timestamp()-interval '50 hours' end,
+   case when i=6 then null else clock_timestamp()-interval '49 hours' end)
+   returning id into item;
+  ids:=array_append(ids,item);
+ end loop;
+ -- 1 private/no job; 2 cancelled/no receipt; 3 posted + verified absent;
+ -- 4 uncertain; 5 posted but still awaiting manual removal; 6 live.
+ insert into matchmaker_internal.post_outbox(listing_id,state,posted_message_id)
+ values(ids[2],'cancelled',null),(ids[3],'posted','1572091972217214003'),
+ (ids[4],'uncertain',null),(ids[5],'posted','1572091972217214005');
+ insert into matchmaker_internal.post_receipts(listing_id,discord_message_id,channel_id,bot_user_id)
+ values(ids[3],'1572091972217214003','1572091972217215001','1572091972217215002'),
+ (ids[5],'1572091972217214005','1572091972217215001','1572091972217215002');
+ insert into matchmaker_internal.cleanup_outbox(listing_id,message_id,channel_id,bot_user_id,state)
+ values(ids[3],'1572091972217214003','1572091972217215001','1572091972217215002','done'),
+ (ids[5],'1572091972217214005','1572091972217215001','1572091972217215002','pending');
+ if matchmaker_internal.purge_resolved_listings(2)<>2 then raise exception 'Bounded listing purge failed'; end if;
+ if matchmaker_internal.purge_resolved_listings(2)<>1 then raise exception 'Resolved listing purge incomplete'; end if;
+ if exists(select 1 from matchmaker_internal.squad_listings where id=any(ids[1:3]))
+ or (select count(*) from matchmaker_internal.squad_listings where id=any(ids[4:6]))<>3
+ then raise exception 'Listing retention removed protected rows or retained resolved rows'; end if;
+ if matchmaker_internal.purge_resolved_listings(2)<>0 then raise exception 'Unsafe or non-idempotent listing retention'; end if;
+end $$;
+rollback;
+select 'Manual resolved listing retention and delivery evidence protection PASSED' as result;
