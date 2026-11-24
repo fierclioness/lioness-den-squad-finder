@@ -47,7 +47,7 @@ grant execute on function matchmaker_internal.purge_expired_transient_rows(integ
 create or replace function matchmaker_internal.purge_resolved_listings(
  p_max_rows integer default 100
 ) returns integer
-language plpgsql security invoker set search_path='' as $
+language plpgsql security invoker set search_path='' as $retention$
 declare v_ids bigint[]; v_count integer;
 begin
  if p_max_rows is null or p_max_rows<1 or p_max_rows>500
@@ -87,7 +87,7 @@ begin
  get diagnostics v_count=row_count;
  if v_count<>cardinality(v_ids) then raise exception 'Listing retention count mismatch'; end if;
  return v_count;
-end $;
+end $retention$;
 -- Manual database administrator only; not callable by webhook/service role.
 revoke all on function matchmaker_internal.purge_resolved_listings(integer)
  from public,anon,authenticated,service_role;
