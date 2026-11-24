@@ -22,6 +22,7 @@ async function matchesSecret(given,expected){
  for(let i=0;i<a.length;i++)diff|=a[i]^b[i];
  return diff===0;
 }
+/** @param {{schedulerSecret?:string,enabled?:boolean,postingEnabled?:boolean,cleanupEnabled?:boolean,maintenanceEnabled?:boolean,publisher?:{runOnce:()=>Promise<any>},cleanup?:{runOnce:()=>Promise<any>},maintenance?:{runOnce:()=>Promise<any>}}} [options] */
 export function makeScheduledWorkerGateway({
  schedulerSecret="",enabled=false,postingEnabled=false,cleanupEnabled=false,
  maintenanceEnabled=false,publisher,cleanup,maintenance
