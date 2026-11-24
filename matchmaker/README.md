@@ -1,28 +1,62 @@
-# The Den Matchmaker — isolated staging, not live
+# The Den Matchmaker — minimum safe release, isolated staging only
 
-**Status November 19, 2026:** Implementation is under review in **draft PR #2**. The existing manual Squad Finder at https://fierclioness.github.io/lioness-den-squad-finder/ remains live and unchanged. Neither the production Den Missions bot nor the Lioness Den's member-facing Discord commands have been altered.
+**Current decision (November 24, 2026): NOT launched.** Existing manual Squad Finder remains available at https://fierclioness.github.io/lioness-den-squad-finder/. Production Den Missions `cpjcjcxinhjusosaguyi` is outside this project. Draft PR #2 is unmerged.
 
-## What is built and verified
+## Verified baseline and remaining gates
 
-- Private, opt-in squad listings with one active listing per member, 36-hour expiry, owner-only close, validation against mentions/links and no automatic DMs.
-- Signed Discord HTTP webhook: raw-body Ed25519 check, bounded timestamp, durable Postgres replay claim, verified guild/member context, ephemeral responses and Confirm/Cancel preview buttons.
-- Isolated Supabase staging project with private PostgreSQL schema, service-only functions, one-use previews, rate limiting, atomic posting outbox and immutable bot message receipts. Ordinary anon/authenticated roles cannot access these tables.
-- Development-only Discord POST and bot-authorship-verified GET-before-DELETE cleanup transport, durable workers and conservative quarantine for uncertain deliveries. No blind retries of ambiguous HTTP operations.
-- Node, Deno and disposable PostgreSQL integration tests covering signed requests, private confirmation, posting with **mock** Discord, owner close, races, expiry and cleanup.
-- A review-only, disabled-by-default scheduler HTTP gateway enforces a distinct secret in addition to a future Supabase JWT gate. Nothing is deployed or scheduled; all worker actions still require explicit authorization.
-- A **separate Den Matchmaker Test** Discord app successfully verified its staging interaction endpoint using a real signed PING (Edge v7), recording a durable replay. Hosted Edge **v10** has been deployed with commands and public posting still disabled, and its read-only/negative HTTPS smoke checks pass.
+- Restricted private `/squad` create, preview, confirmation, mine/list and close succeeded on November 20. Signed requests, persistent replay rejection, explicit consent and mocked original-bot receipts have extensive passing CI evidence.
+- Hosted staging `tcxktyqywsqafnyxhpgy`: signed webhook v19; separate inert named-secret worker v1. Missing key 401 and dedicated-key disabled 503 confirmed. Do not repeat these already-passed checks without relevant changes.
+- Bounded privacy functions `purge_expired_transient_rows` and administrator-only `purge_resolved_listings` are installed in staging after green CI on c9a8ff75. No purge has been run. No public posting, automatic Discord deletion, scheduler, member edits or production changes authorized.
+- This draft introduces the smallest controlled-test runtime wiring: explicit single-tester enqueue and a manually invoked single-item publisher on the existing separate worker. Both are OFF by default. The publisher uses the existing named-secret wrapper **and** the independent operator-key gateway, fixed reviewed channel and original bot identity. No deletion route, recurring schedule or new service is required. Nothing in this draft has been deployed.
+- Before any controlled real test: review green CI, authorize one synthetic listing and exactly one original test-bot post in the owner-approved #squad-up destination, confirm the bot's channel permissions and identity, configure test-only credentials privately, deploy only to isolated staging, and verify the queue is empty. Do not enable member-wide commands. Do not reuse production credentials.
 
-## Critical explicit-consent rule
+## Controlled test (separate explicit owner approval required)
 
-A member's **Save to /squad list** confirmation calls `confirm_preview`: the opt-in listing is discoverable by other permitted Matchmaker users using `/squad list`, but **does not enqueue a channel post**. Enabling a posting worker later cannot retroactively publish that private listing. A distinct reviewed `publishingEnabled:true` command flow is required to call `confirm_and_enqueue`, and the preview must say **Post to #squad-up** before the member confirms. Public sending requires a **separate** bot worker gate, fixed approved channel and operator authorization. All publishing gates are **OFF** in staging.
+1. Owner chooses one authorized tester and confirms the exact existing #squad-up channel and original test bot; no new guild installation or app permission change without its own approval. Use clearly labeled synthetic preferences, not member information.
+2. Store credentials only through staging secret controls: existing dedicated `den_matchmaker_scheduler` API key, independent `DEN_MATCHMAKER_OPERATOR_KEY`, `DEN_MATCHMAKER_TEST_BOT_TOKEN`, `DEN_MATCHMAKER_TEST_BOT_USER_ID`, `DEN_MATCHMAKER_TEST_CHANNEL_ID`, one `DEN_MATCHMAKER_TESTER_IDS` entry. No credential values in chat, GitHub, logs or screenshots. Verify staging DB connection resolves only to this project. For a future production release, independently review a dedicated least-privilege runtime database identity; staging credentials must never be reused.
+3. Only for the approved test window, enable `DEN_MATCHMAKER_COMMANDS_ENABLED`, `DEN_MATCHMAKER_TEST_ENQUEUE_ENABLED`, and `DEN_MATCHMAKER_TEST_PUBLISH_ENABLED`. Verify the owner-only preview explicitly says Post to #squad-up; Cancel first, then create a fresh preview and confirm one synthetic listing. Measure actual client acknowledgement. Verify exactly one pending job and no unrelated jobs before invoking the publisher.
+4. Invoke one POST to the existing worker's `/publish` route with the named key and operator key header `x-matchmaker-scheduler-key`, **no request body**. Never retry an ambiguous send. Verify actual bot authorship, expected channel, exact message content/reference, one stored receipt, and no duplicate. Immediately disable both enqueue and publish flags; do not schedule calls.
+5. Close the test listing. Manual moderation is sufficient for MVP: separate owner approval is required for any actual Discord removal; no automatic DELETE endpoint is used. Verify absence as below. Confirm the emergency disable and no other messages. Independently review security and privacy before requesting separate release approval.
 
-## Still required before launch
+## Minimum viable privacy and daily moderator procedure
 
-1. The owner must explicitly authorize installing the separate test app and guild-scoped `/squad` registration, initially with posting OFF.
-2. Verify a real secondary-account slash-command flow and the initial interaction response deadline, including cold start/DB failure cases.
-3. Review and test bot permissions, approved destination, authenticated scheduler, 36-hour expiry, late or uncertain post reconciliation, verified original-message cleanup and rollback on a controlled test channel.
-4. Review a least-privilege production credential/migration plan and get explicit permission for **each** production configuration change, public-post enablement, PR merge and launch.
+Listings are visible through /squad only while active and unexpired (36h maximum). A member can close their listing at any time. A Discord post is not automatically removed merely because the database listing closes. Before public launch, the owner must accept daily moderation coverage and publish accurate notice of what is stored, the retention window and how to request removal; never promise automatic deletion when it is disabled.
 
-**Never treat a passing offline test or Discord signed PING as authorization to post publicly.**
+Authorized database administrator, isolated staging only until separate production approval:
 
-More detail: [hosted staging verification](hosted-staging-status.md), [Edge release gates](edge-runtime-release-gates.md), [cleanup lifecycle](cleanup-release-gates.md), and [posting recovery](posting-recovery-plan.md).
+- Keep posting and automatic cleanup OFF during manual maintenance. Run the existing bounded `expire_due_listings(100)` RPC to mark expired listings, cancel unsent jobs and queue known receipts. It makes no Discord calls. Review due/closed listings and their cleanup receipts; never expose owner IDs to public channels or logs.
+- For each expired/closed post, verify the exact receipt's message ID, channel ID, original bot ID and persisted listing reference against authenticated Discord GET. Only a moderator may remove the verified message, with appropriate approval. Re-fetch the same message using the authorized original bot. **Only Discord's exact Unknown Message (HTTP 404 / code 10008) with known channel access establishes absence.** A permission error, generic 404 or search miss does not. Record the time and verification outcome privately without credentials or member preferences.
+- After verified absence, an administrator can mark the existing exact cleanup row done (never a claimed/in-flight row). Use a transaction, lock the listing first, and compare all receipt identifiers and inactive status. The example below is an operator procedure, NOT a scheduled query or permission to edit data. Substitute only independently verified values; require exactly one returned row before committing; otherwise roll back.
+
+```sql
+begin;
+select id from matchmaker_internal.squad_listings
+ where id = :verified_listing_id
+   and (status in ('closed','expired') or expires_at <= clock_timestamp())
+ for update;
+update matchmaker_internal.cleanup_outbox c
+ set state='done', claimed_by=null, updated_at=clock_timestamp()
+ from matchmaker_internal.post_receipts r,
+      matchmaker_internal.post_outbox o,
+      matchmaker_internal.squad_listings s
+ where c.listing_id=:verified_listing_id
+   and c.listing_id=r.listing_id and c.listing_id=o.listing_id
+   and c.listing_id=s.id and c.state in ('pending','uncertain')
+   and o.state='posted' and o.posted_message_id=r.discord_message_id
+   and c.message_id=r.discord_message_id and c.channel_id=r.channel_id
+   and c.bot_user_id=r.bot_user_id
+   and c.message_id=:verified_message_id and c.channel_id=:verified_channel_id
+   and c.bot_user_id=:verified_bot_id
+   and (s.status in ('closed','expired') or s.expires_at<=clock_timestamp())
+ returning c.listing_id;
+-- Commit only after confirming exactly one locked listing and one updated row.
+-- Otherwise ROLLBACK. Never execute against Den Missions.
+```
+
+- Once daily, after the owner has approved the real retention process, the administrator invokes the bounded transient purge and resolved listing purge: `select * from matchmaker_internal.purge_expired_transient_rows(100);` and `select matchmaker_internal.purge_resolved_listings(100);`. The former preserves the replay safety margin; the latter requires at least 24 hours since close/expiry and excludes uncertain or unresolved public deliveries. Keep aggregate counts only. The proposed daily cadence means deletion eligibility at 24h, not guaranteed deletion exactly at 24h.
+- For sending/uncertain jobs, stop publishing, wait until all in-flight calls are definitively quiescent, and investigate the exact listing reference in the approved channel. Do not retry or purge based on a search miss. Recover a known receipt via the existing verified manual reconciliation procedure. If no authoritative receipt/absence can be established, escalate to the privacy administrator promptly for an auditable case-specific deletion decision; unresolved evidence must not become indefinite routine retention. A workable verified resolution/deletion procedure and privacy request coverage must be signed off before member launch. The controlled synthetic test must stop on ambiguity.
+- Emergency disable: turn both test enqueue and publish flags OFF immediately, disable commands if necessary, and keep the named-auth worker inert. Preserve the original Squad Finder. No automatic Discord deletion or advanced scheduling is an MVP launch gate.
+
+## Explicit decisions outstanding
+
+Controlled real Discord test approval (one synthetic post only), real client acknowledgement and correct-channel receipt, independently reviewed manual retention/removal and unresolved-delivery handling, credential/permission security review, and explicit launch approval. No PR merge, production changes, member-data modification or public launch is authorized by this document.

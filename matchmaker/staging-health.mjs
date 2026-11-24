@@ -2,8 +2,8 @@
 // No secrets, database queries, member lookups, or command execution occur here.
 // The status reflects trusted server-side configuration, never request parameters.
 // This endpoint reports ROUTING/CONFIG state, not database availability or E2E readiness.
-export function stagingHealthResponse(request,{commandsEnabled=false,configured=true}={}){
- if(typeof commandsEnabled!=="boolean"||typeof configured!=="boolean")
+export function stagingHealthResponse(request,{commandsEnabled=false,configured=true,postingEnabled=false}={}){
+ if(typeof commandsEnabled!=="boolean"||typeof configured!=="boolean"||typeof postingEnabled!=="boolean")
    throw Error("Health feature flags must be booleans");
  const url=new URL(request.url);
  const isHealth=url.pathname==="/health" || url.pathname==="/den-matchmaker/health" ||
@@ -16,7 +16,7 @@ export function stagingHealthResponse(request,{commandsEnabled=false,configured=
    service:"den-matchmaker",
    environment:"staging",
    status,
-   posting_enabled:false,
+   posting_enabled:configured&&commandsEnabled&&postingEnabled,
    member_data_access:false // The health endpoint itself never queries member data.
  }),{
    status:200,

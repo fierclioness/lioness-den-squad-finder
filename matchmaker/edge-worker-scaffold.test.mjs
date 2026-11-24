@@ -10,15 +10,16 @@ test("auth-only staging worker scaffold is fail-closed and named-secret gated",(
  assert.match(source,/status:"disabled"/);
  assert.match(source,/cache-control":"no-store"/);
 });
-test("staging maintenance worker requires opt-in and dedicated staging identity, with no Discord transport",()=>{
+test("staging maintenance branch requires opt-in and dedicated staging identity, with no Discord transport",()=>{
+ const maintenance=source.slice(source.indexOf('if(Deno.env.get("DEN_MATCHMAKER_MAINTENANCE_ENABLED")'));
  assert.match(source,/DEN_MATCHMAKER_MAINTENANCE_ENABLED"\)!=="true"\)return disabled\(\)/);
  assert.match(source,/DEN_MATCHMAKER_MAINTENANCE_DATABASE_URL/);
  assert.match(source,/den_matchmaker_maintenance/);
  assert.match(source,/resolvePrivateDatabaseUrl/);
- assert.ok(source.indexOf('DEN_MATCHMAKER_MAINTENANCE_ENABLED')<source.indexOf("new pg.Pool"));
- assert.ok(source.indexOf('den_matchmaker_maintenance')<source.indexOf("new pg.Pool"));
+ assert.ok(maintenance.indexOf('DEN_MATCHMAKER_MAINTENANCE_ENABLED')<maintenance.indexOf("new pg.Pool"));
+ assert.ok(maintenance.indexOf('den_matchmaker_maintenance')<maintenance.indexOf("new pg.Pool"));
  for(const unsafe of [/fetch\s*\(/,/execute_sql/,/supabaseAdmin/,/sendMessage/,/DELETE/,/makeScheduledWorkerComposition/,/makeDiscordTransport/,/makeOutboxWorker/,/makeCleanupOutboxWorker/]){
-  assert.doesNotMatch(source,unsafe);
+  assert.doesNotMatch(maintenance,unsafe);
  }
 });
 
@@ -30,6 +31,9 @@ test("Discord interaction webhook stays isolated from the scheduler and bot-owne
  ])assert.doesNotMatch(webhook,unsafe,"Signed Discord ingress must never load privileged scheduler or bot worker code");
  assert.match(webhook,/makeMatchmakerServer/);
  assert.match(webhook,/DEN_MATCHMAKER_COMMANDS_ENABLED/);
+ assert.match(webhook,/DEN_MATCHMAKER_TEST_ENQUEUE_ENABLED/);
+ assert.match(webhook,/publishingRequested&&enabled&&testerAllowlistValid&&allowedTesterIds\.size===1/);
+ assert.match(webhook,/\(!publishingRequested\|\|publishingEnabled\)/);
 });
 test("JWT bypass is scoped only to the named-secret worker, never the Discord webhook",()=>{
  const config=readFileSync(new URL("../supabase/config.toml",import.meta.url),"utf8");
@@ -42,6 +46,12 @@ test("worker must not broaden authentication or silently gain privileged capabil
  assert.doesNotMatch(source,/auth\s*:\s*["'](?:none|secret|publishable|user)["']/);
  assert.doesNotMatch(source,/auth\s*:\s*\[/);
  assert.doesNotMatch(source,/supabaseAdmin|service_role|SUPABASE_SECRET_KEYS|SUPABASE_DB_URL/);
- assert.doesNotMatch(source,/x-matchmaker-scheduler-key|makeMaintenanceWorker|makeOutboxWorker|makeCleanupOutboxWorker/);
+ assert.doesNotMatch(source,/makeMaintenanceWorker|makeCleanupOutboxWorker|makeVerifiedBotCleanup/);
+ assert.match(source,/DEN_MATCHMAKER_TEST_PUBLISH_ENABLED"\)!=="true"\)return disabled\(\)/);
+ assert.match(source,/DEN_MATCHMAKER_OPERATOR_KEY/);
+ assert.match(source,/cleanupEnabled:false,maintenanceEnabled:false,publisher/);
+ assert.match(source,/testerIds\.length!==1/);
+ assert.match(source,/makeScheduledWorkerGateway/);
+ assert.match(source,/makeOutboxWorker/);
  assert.equal((source.match(/secret:den_matchmaker_scheduler/g)||[]).length,1);
 });

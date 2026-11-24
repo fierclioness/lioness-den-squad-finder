@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'supabase/functions/den-matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
       - 'matchmaker/**'
       - '.github/workflows/matchmaker-deno.yml'
   push:
@@ -10,6 +11,7 @@ on:
       - 'feature/den-matchmaker-mvp-2026-11-18'
     paths:
       - 'supabase/functions/den-matchmaker/**'
+      - 'supabase/functions/den-matchmaker-worker/**'
       - 'matchmaker/**'
       - '.github/workflows/matchmaker-deno.yml'
 permissions:
@@ -23,7 +25,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check Edge entrypoint (without any production connection)
-        run: deno check supabase/functions/den-matchmaker/index.ts
+        run: deno check supabase/functions/den-matchmaker/index.ts supabase/functions/den-matchmaker-worker/index.ts
       - name: Real hosted staging HTTP smoke (no secrets or writes)
         env:
           STAGING_URL: https://tcxktyqywsqafnyxhpgy.supabase.co/functions/v1/den-matchmaker
