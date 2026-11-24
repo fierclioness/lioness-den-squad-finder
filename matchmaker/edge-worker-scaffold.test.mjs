@@ -10,8 +10,14 @@ test("auth-only staging worker scaffold is fail-closed and named-secret gated",(
  assert.match(source,/status:"disabled"/);
  assert.match(source,/cache-control":"no-store"/);
 });
-test("inert worker scaffold cannot touch private database or Discord",()=>{
- for(const unsafe of [/fetch\s*\(/,/execute_sql/,/supabaseAdmin/,/query\s*\(/,/sendMessage/,/DELETE/,/POST/,/makeScheduledWorkerComposition/,/Deno\.env\.get/]){
+test("staging maintenance worker requires opt-in and dedicated staging identity, with no Discord transport",()=>{
+ assert.match(source,/DEN_MATCHMAKER_MAINTENANCE_ENABLED"\)!=="true"\)return disabled\(\)/);
+ assert.match(source,/DEN_MATCHMAKER_MAINTENANCE_DATABASE_URL/);
+ assert.match(source,/den_matchmaker_maintenance/);
+ assert.match(source,/resolvePrivateDatabaseUrl/);
+ assert.ok(source.indexOf('DEN_MATCHMAKER_MAINTENANCE_ENABLED')<source.indexOf("new pg.Pool"));
+ assert.ok(source.indexOf('den_matchmaker_maintenance')<source.indexOf("new pg.Pool"));
+ for(const unsafe of [/fetch\s*\(/,/execute_sql/,/supabaseAdmin/,/sendMessage/,/DELETE/,/makeScheduledWorkerComposition/,/makeDiscordTransport/,/makeOutboxWorker/,/makeCleanupOutboxWorker/]){
   assert.doesNotMatch(source,unsafe);
  }
 });
